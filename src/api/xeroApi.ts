@@ -14,7 +14,7 @@ export const getXeroConnectionStatus =
   async (): Promise<XeroConnectionStatus> => {
     try {
       const res = await instance.get<XeroConnectionStatus>("/xero/status");
-      console.log(res)
+      console.log(res);
       return res.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -32,7 +32,7 @@ export const createXeroInvoice = async (
       "/xero/create-invoice",
       invoiceData
     );
-    console.log(data)
+    console.log(data);
     return data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -43,9 +43,7 @@ export const createXeroInvoice = async (
 
 export const authorizeXero = (): Promise<boolean> => {
   return new Promise((resolve, reject) => {
-    const authUrl = `${
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
-    }/api/xero/authorize`;
+    const authUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/api/xero/authorize`;
 
     const width = 600;
     const height = 700;
@@ -68,7 +66,7 @@ export const authorizeXero = (): Promise<boolean> => {
     const messageListener = (event: MessageEvent) => {
       // Verify origin for security
       const allowedOrigins = [
-        process.env.NEXT_PUBLIC_API_URL,
+        process.env.NEXT_PUBLIC_BASE_URL,
         "http://localhost:8000",
         "http://localhost:3000",
         window.location.origin,
