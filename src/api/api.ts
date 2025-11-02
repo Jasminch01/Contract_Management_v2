@@ -8,7 +8,7 @@ import { userLogOut } from "./Auth";
 
 // await clerk.load();
 export const instance: AxiosInstance = axios.create({
-  baseURL: "https://contract-management-server-pajyejvow-jasmin-chakmas-projects.vercel.app/api/",
+  baseURL: process.env.NEXT_PUBLIC_BASE_URL,
   withCredentials: true,
 });
 
