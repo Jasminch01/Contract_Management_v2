@@ -10,6 +10,7 @@ interface ContactDetails {
   name: string;
   email: string;
   phoneNumber: string;
+  isPrimary?: boolean;
 }
 
 const CreateBuyerPage = () => {
@@ -30,6 +31,7 @@ const CreateBuyerPage = () => {
     name: "",
     email: "",
     phoneNumber: "",
+    isPrimary: false,
   });
 
   const createBuyerMutation = useMutation({
@@ -76,6 +78,13 @@ const CreateBuyerPage = () => {
     }));
   };
 
+  const handlePrimaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCurrentContact((prev) => ({
+      ...prev,
+      isPrimary: e.target.checked,
+    }));
+  };
+
   const addContact = () => {
     // Validate contact fields
     if (!currentContact.name.trim()) {
@@ -105,28 +114,70 @@ const CreateBuyerPage = () => {
       toast.error("Contact name already exists");
       return;
     }
+    if (
+      contacts.some(
+        (c) =>
+          c.email.trim().toLowerCase() ===
+          currentContact.email.trim().toLowerCase()
+      )
+    ) {
+      toast.error("Contact email already exists");
+      return;
+    }
 
     // Add contact to list
     const newContact = {
       name: currentContact.name.trim(),
       email: currentContact.email.trim(),
       phoneNumber: currentContact.phoneNumber.trim(),
+      isPrimary: currentContact.isPrimary || false,
     };
 
-    setContacts((prev) => [...prev, newContact]);
+    // If this contact is marked as primary, remove primary from others
+    let updatedContacts = contacts;
+    if (newContact.isPrimary) {
+      updatedContacts = contacts.map((c) => ({ ...c, isPrimary: false }));
+    }
+
+    // If this is the first contact, make it primary automatically
+    if (contacts.length === 0) {
+      newContact.isPrimary = true;
+    }
+
+    setContacts([newContact, ...updatedContacts]);
 
     // Reset current contact form
     setCurrentContact({
       name: "",
       email: "",
       phoneNumber: "",
+      isPrimary: false,
     });
 
     toast.success("Contact added successfully");
   };
 
   const removeContact = (nameToRemove: string) => {
-    setContacts((prev) => prev.filter((c) => c.name !== nameToRemove));
+    const updatedContacts = contacts.filter((c) => c.name !== nameToRemove);
+
+    // If we removed the primary contact and there are still contacts left,
+    // make the first one primary
+    const removedContact = contacts.find((c) => c.name === nameToRemove);
+    if (removedContact?.isPrimary && updatedContacts.length > 0) {
+      updatedContacts[0].isPrimary = true;
+    }
+
+    setContacts(updatedContacts);
+  };
+
+  const setPrimaryContact = (contactName: string) => {
+    setContacts((prev) =>
+      prev.map((c) => ({
+        ...c,
+        isPrimary: c.name === contactName,
+      }))
+    );
+    toast.success("Primary contact updated");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -274,7 +325,7 @@ const CreateBuyerPage = () => {
             {/* Contact Details Section */}
             <div className="border-t pt-6 mt-6">
               <h2 className="font-semibold text-lg mb-4">Contact Details *</h2>
-              
+
               {/* Add Contact Form */}
               <div className="space-y-4 bg-gray-50 p-4 rounded-md">
                 <div className="flex flex-col md:flex-row gap-4">
@@ -321,6 +372,27 @@ const CreateBuyerPage = () => {
                     />
                   </div>
                 </div>
+
+                {/* Primary Contact Checkbox - only show if there are already contacts */}
+                {contacts.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="isPrimary"
+                      checked={currentContact.isPrimary}
+                      onChange={handlePrimaryChange}
+                      className="w-4 h-4 text-[#2A5D36] focus:ring-[#2A5D36] border-gray-300 rounded"
+                      disabled={createBuyerMutation.isPending}
+                    />
+                    <label
+                      htmlFor="isPrimary"
+                      className="text-sm font-medium text-gray-700"
+                    >
+                      Set as Primary Contact
+                    </label>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={addContact}
@@ -334,20 +406,43 @@ const CreateBuyerPage = () => {
               {/* Display Added Contacts */}
               {contacts.length > 0 && (
                 <div className="mt-4 space-y-2">
-                  <h3 className="text-sm font-medium text-gray-700">Added Contacts:</h3>
+                  <h3 className="text-sm font-medium text-gray-700">
+                    Added Contacts:
+                  </h3>
                   {contacts.map((contact, index) => (
                     <div
                       key={index}
-                      className="bg-white border border-gray-200 rounded-md p-4 flex justify-between items-start"
+                      className={`bg-white border rounded-md p-4 flex justify-between items-start ${
+                        contact.isPrimary
+                          ? "border-[#2A5D36] border-2"
+                          : "border-gray-200"
+                      }`}
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="font-medium text-gray-900">{contact.name}</span>
+                          <span className="font-medium text-gray-900">
+                            {contact.name}
+                          </span>
+                          {contact.isPrimary && (
+                            <span className="bg-[#2A5D36] text-white text-xs px-2 py-1 rounded-full">
+                              Primary
+                            </span>
+                          )}
                         </div>
                         <div className="text-sm text-gray-600 space-y-1">
                           <div>📧 {contact.email}</div>
                           <div>📞 {contact.phoneNumber}</div>
                         </div>
+                        {!contact.isPrimary && (
+                          <button
+                            type="button"
+                            onClick={() => setPrimaryContact(contact.name)}
+                            className="mt-2 text-xs text-[#2A5D36] hover:underline"
+                            disabled={createBuyerMutation.isPending}
+                          >
+                            Set as Primary
+                          </button>
+                        )}
                       </div>
                       <button
                         type="button"

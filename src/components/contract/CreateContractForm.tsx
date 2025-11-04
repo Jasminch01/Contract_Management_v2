@@ -336,22 +336,29 @@ const CreateContractForm = () => {
 
   // For updating buyer information
   const handleBuyerSelect = (buyer: Buyer) => {
+    const primaryContact = buyer.contacts?.find((c) => c.isPrimary);
+
     setFormData((prev) => ({
       ...prev,
       buyer: buyer._id as string,
-      buyerContactName: buyer.contactName[0],
+      buyerContact: primaryContact,
     }));
   };
 
   // For updating seller information
-  const handleSellerSelect = (seller: Seller) => {
-    setSelectedSeller(seller);
-    setFormData((prev) => ({
-      ...prev,
-      seller: seller._id as string,
-      sellerContactName: seller.contactName[0],
-    }));
-  };
+const handleSellerSelect = (seller: Seller) => {
+  const primaryContact =
+    seller.contactName?.find((c) => c.isPrimary === true);
+  
+  console.log(primaryContact);
+  setSelectedSeller(seller);
+
+  setFormData((prev) => ({
+    ...prev,
+    seller: seller._id as string,
+    sellerContact: primaryContact,
+  }));
+};
 
   // For updating contract type
   const handleContractTypeSelect = (type: ContractType) => {
@@ -503,7 +510,6 @@ const CreateContractForm = () => {
     };
 
     createContractMutation.mutate(draftContract);
-    // console.log(draftContract)
   };
 
   return (
