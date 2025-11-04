@@ -14,7 +14,6 @@ export const getXeroConnectionStatus =
   async (): Promise<XeroConnectionStatus> => {
     try {
       const res = await instance.get<XeroConnectionStatus>("/xero/status");
-      console.log(res);
       return res.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -43,7 +42,7 @@ export const createXeroInvoice = async (
 
 export const authorizeXero = (): Promise<boolean> => {
   return new Promise((resolve, reject) => {
-    const authUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/xero/authorize`;
+    const authUrl = `${process.env.NEXT_PUBLIC_BASE_URL}xero/authorize`;
 
     const width = 600;
     const height = 700;

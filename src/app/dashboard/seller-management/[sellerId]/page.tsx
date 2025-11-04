@@ -204,9 +204,16 @@ const SellerInformationPage = () => {
                           <p className="text-xs text-gray-500 uppercase mb-1">
                             Contact Name
                           </p>
-                          <p className="font-medium text-gray-900">
-                            {contact.name}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-900">
+                              {contact.name}
+                            </p>
+                            {contact.isPrimary && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                                Primary
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div>
                           <p className="text-xs text-gray-500 uppercase mb-1">

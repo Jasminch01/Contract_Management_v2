@@ -354,6 +354,7 @@ const BuyerInformationEditPage = () => {
             </div>
 
             {/* Existing Contacts */}
+            {/* Existing Contacts */}
             <div className="p-6">
               {buyerData.contacts.length > 0 && (
                 <div className="space-y-4 mb-6">
@@ -363,9 +364,16 @@ const BuyerInformationEditPage = () => {
                       className="border border-gray-200 rounded-md p-4 bg-gray-50"
                     >
                       <div className="flex justify-between items-start mb-3">
-                        <h4 className="font-medium text-gray-700">
-                          Contact {index + 1}
-                        </h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium text-gray-700">
+                            Contact {index + 1}
+                          </h4>
+                          {contact.isPrimary === true && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                              Primary
+                            </span>
+                          )}
+                        </div>
                         <button
                           type="button"
                           onClick={() => removeContact(index)}
@@ -423,6 +431,38 @@ const BuyerInformationEditPage = () => {
                             className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:border-green-700"
                           />
                         </div>
+                      </div>
+                      {/* Primary Contact Checkbox */}
+                      <div className="mt-3 flex items-center">
+                        <input
+                          type="checkbox"
+                          id={`primary-${index}`}
+                          checked={contact.isPrimary === true}
+                          onChange={(e) => {
+                            setBuyerData((prev) => {
+                              if (!prev) return null;
+                              const updatedContacts = prev.contacts.map(
+                                (c, i) => ({
+                                  ...c,
+                                  isPrimary:
+                                    i === index ? e.target.checked : false,
+                                })
+                              );
+                              return {
+                                ...prev,
+                                contacts: updatedContacts,
+                              };
+                            });
+                          }}
+                          disabled={updateBuyerMutation.isPending}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <label
+                          htmlFor={`primary-${index}`}
+                          className="ml-2 text-sm text-gray-700"
+                        >
+                          Set as primary contact
+                        </label>
                       </div>
                     </div>
                   ))}
