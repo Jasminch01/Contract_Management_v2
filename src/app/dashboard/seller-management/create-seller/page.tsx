@@ -217,15 +217,6 @@ const CreateSellerPage = () => {
       toast.error("Contact with this email already exists");
       return;
     }
-    const nameExists = formData.contactName.some(
-      (contact) =>
-        contact.name.toLowerCase() === currentContact.name.toLowerCase()
-    );
-
-    if (nameExists) {
-      toast.error("Contact with this name already exists");
-      return;
-    }
 
     // Add contact to list
     const newContact = {

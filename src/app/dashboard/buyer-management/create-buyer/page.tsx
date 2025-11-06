@@ -109,11 +109,7 @@ const CreateBuyerPage = () => {
       return;
     }
 
-    // Check for duplicate contact name
-    if (contacts.some((c) => c.name === currentContact.name.trim())) {
-      toast.error("Contact name already exists");
-      return;
-    }
+    // Check for duplicate contact email
     if (
       contacts.some(
         (c) =>
