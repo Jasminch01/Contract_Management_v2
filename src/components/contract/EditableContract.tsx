@@ -331,15 +331,12 @@ const EditableContract: React.FC<ContractProps> = ({
   };
 
   const handleSellerContact = (contact: ContactDetails) => {
-    // ✅ Only update if contact is different
-    if (contact.name !== contract.sellerContact?.name) {
       setSelectedSellerContact(contact);
       setContract((prev) => ({
         ...prev,
         sellerContact: contact,
       }));
       setHasChanges(true);
-    }
     setShowSellerContactDropdown(false);
   };
 
