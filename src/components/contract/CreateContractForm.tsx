@@ -349,8 +349,7 @@ const CreateContractForm = () => {
 const handleSellerSelect = (seller: Seller) => {
   const primaryContact =
     seller.contactName?.find((c) => c.isPrimary === true);
-  
-  console.log(primaryContact);
+
   setSelectedSeller(seller);
 
   setFormData((prev) => ({
