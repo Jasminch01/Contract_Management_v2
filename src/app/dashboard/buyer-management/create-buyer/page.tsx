@@ -110,16 +110,6 @@ const CreateBuyerPage = () => {
     }
 
     // Check for duplicate contact email
-    if (
-      contacts.some(
-        (c) =>
-          c.email.trim().toLowerCase() ===
-          currentContact.email.trim().toLowerCase()
-      )
-    ) {
-      toast.error("Contact email already exists");
-      return;
-    }
 
     // Add contact to list
     const newContact = {
