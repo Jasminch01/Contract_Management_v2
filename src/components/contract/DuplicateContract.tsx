@@ -57,7 +57,7 @@ const EditableContract: React.FC<ContractProps> = ({
   const [uploadingBuyerContract, setUploadingBuyerContract] = useState(false);
   const [uploadingSellerContract, setUploadingSellerContract] = useState(false);
   const [preview, setPreview] = useState(false);
-  const [contract, setContract] = useState(initialContract);
+  const [contract, setContract] = useState({...initialContract,  buyerContractReference: "",sellerContractReference: "", });
   const [hasChanges, setHasChanges] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showBrokeragePayableDropdown, setShowBrokeragePayableDropdown] =
@@ -195,12 +195,12 @@ const EditableContract: React.FC<ContractProps> = ({
   };
 
   const handleSellerContact = (contact: ContactDetails) => {
-      setSelectedSellerContact(contact);
-      setContract((prev) => ({
-        ...prev,
-        sellerContact: contact,
-      }));
-      setHasChanges(true);
+    setSelectedSellerContact(contact);
+    setContract((prev) => ({
+      ...prev,
+      sellerContact: contact,
+    }));
+    setHasChanges(true);
     setShowSellerContactDropdown(false);
   };
 
@@ -509,6 +509,16 @@ const EditableContract: React.FC<ContractProps> = ({
 
       buyerContactName: selectedBuyerContact,
       sellerContactName: selectedSellerContact,
+      buyerContractReference:
+        contract.buyerContractReference !==
+        initialContract.buyerContractReference
+          ? contract.buyerContractReference
+          : "",
+      sellerContractReference:
+        contract.sellerContractReference !==
+        initialContract.sellerContractReference
+          ? contract.sellerContractReference
+          : "",
     };
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { _id, createdAt, _v, updatedAt, ...contractWithoutId } =
