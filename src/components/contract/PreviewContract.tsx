@@ -41,7 +41,7 @@ const PreviewContract: React.FC<PreviewContractProps> = ({
               <p>{selectedBuyer?.name}</p>
               <p>{selectedBuyer?.officeAddress}</p>
               <p>ABN : {selectedBuyer?.abn}</p>
-              <p>Email : {selectedBuyer?.email}</p>
+              <p>Email : {contract.buyerContact?.email}</p>
               <p>
                 Contact : {contract.buyerContact?.name || contract.buyer.name}
               </p>
@@ -57,7 +57,7 @@ const PreviewContract: React.FC<PreviewContractProps> = ({
               <p>{selectedSeller?.legalName}</p>
               <p>{selectedSeller?.address}</p>
               <p>NGR : {contract.ngrNumber || "N/A"}</p>
-              <p>Email : {selectedSeller?.email}</p>
+              <p>Email : {contract.sellerContact?.email}</p>
               <p>
                 Contact : {contract?.sellerContact?.name}{" "}
                 {contract?.sellerContact?.phoneNumber ||
