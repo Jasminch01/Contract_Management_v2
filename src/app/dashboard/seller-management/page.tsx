@@ -29,6 +29,7 @@ interface FetchSellersParams {
   limit?: number;
   legalName?: string;
   abn?: string;
+  mainNgr: string;
   contactName?: string;
   email?: string;
   phoneNumber?: string;
@@ -198,6 +199,7 @@ const SellerManagementPage = () => {
     const params: FetchSellersParams = {
       page: paginationState.page,
       limit: paginationState.limit,
+      mainNgr: ""
     };
 
     // Add search filters
@@ -205,6 +207,7 @@ const SellerManagementPage = () => {
       // For seller search, we can search across multiple fields
       params.legalName = searchTerm.trim();
       params.abn = searchTerm.trim();
+      params.mainNgr = searchTerm.trim();
     }
 
     if (paginationState.dateFilter !== "all") {
@@ -437,7 +440,7 @@ const SellerManagementPage = () => {
         <div className="w-full xl:w-[30rem] md:w-64 lg:w-80 px-4 py-2 rounded-md border border-gray-300 flex items-center gap-2 bg-white shadow-sm">
           <input
             type="text"
-            placeholder="Search by Name, ABN"
+            placeholder="Search by Name, ABN, MainNGR"
             className="w-full focus:outline-none bg-transparent"
             value={searchInput}
             onChange={handleSearchInputChange}

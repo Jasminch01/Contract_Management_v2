@@ -38,9 +38,9 @@ export const getsellers = async (
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      console.error("Axios error fetching sellers:", error.message);
+      // console.error("Axios error fetching sellers:", error.message);
     } else {
-      console.error("Unexpected error fetching sellers:", error);
+      // console.error("Unexpected error fetching sellers:", error);
     }
 
     // Return correct empty structure
@@ -53,6 +53,7 @@ export const getsellers = async (
   }
 };
 export const searchSellers = async (query: string): Promise<Seller[]> => {
+  console.log(query)
   try {
     if (!query || !query.trim()) {
       return [];
