@@ -53,7 +53,6 @@ export const getsellers = async (
   }
 };
 export const searchSellers = async (query: string): Promise<Seller[]> => {
-  console.log(query)
   try {
     if (!query || !query.trim()) {
       return [];
