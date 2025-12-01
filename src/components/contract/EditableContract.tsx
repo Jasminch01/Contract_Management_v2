@@ -93,16 +93,16 @@ const EditableContract: React.FC<ContractProps> = ({
 
   const { data: sellersResponse } = useQuery({
     queryKey: ["sellers"],
-    queryFn: () => getsellers({ limit: 100 }), // Pass parameters and call as function
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    queryFn: () => getsellers({ limit: 100 }),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const { data: buyersResponse } = useQuery({
     queryKey: ["buyers"],
-    queryFn: () => getBuyers({ limit: 100 }), // Pass parameters and call as function
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    queryFn: () => getBuyers({ limit: 100 }),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000, 
   });
   const sellers = sellersResponse?.data || [];
   const buyers = buyersResponse?.data || [];
