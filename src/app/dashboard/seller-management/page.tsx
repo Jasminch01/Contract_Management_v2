@@ -61,11 +61,12 @@ const columns = [
     name: "CONTACT NAMES",
     selector: (row: Seller) =>
       Array.isArray(row?.contactName)
-        ? row.contactName.join(", ")
-        : row?.contactName || "",
+        ? row.contactName.map((contact) => contact.name).join(", ")
+        : "N/A",
     sortable: true,
     sortField: "contactName",
   },
+
   {
     name: "EMAIL",
     selector: (row: Seller) => row?.email || "",

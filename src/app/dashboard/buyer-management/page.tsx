@@ -44,9 +44,9 @@ const columns = [
   {
     name: "CONTACT NAMES",
     selector: (row: Buyer) =>
-      Array.isArray(row?.contactName)
-        ? row.contactName.join(", ")
-        : row?.contactName || "",
+      Array.isArray(row.contacts)
+        ? row.contacts.map((contact) => contact.name).join(", ")
+        : "",
     sortable: true,
     sortField: "contactName",
   },

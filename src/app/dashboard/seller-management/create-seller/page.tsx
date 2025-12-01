@@ -4,7 +4,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from "react-hot-toast";
-import { BulkHandlerCredential, Seller } from "@/types/types";
+import { BulkHandlerCredential, Seller, ContactDetails } from "@/types/types";
 import { createSeller } from "@/api/sellerApi";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
@@ -40,7 +40,14 @@ const CreateSellerPage = () => {
     new Array(handlerNames.length).fill(false)
   );
   const [uploadingAthAct, setUploadingAthAct] = useState(false);
-  const [currentContactName, setCurrentContactName] = useState("");
+
+  // Updated contact state to handle ContactDetails object
+  const [currentContact, setCurrentContact] = useState<ContactDetails>({
+    name: "",
+    email: "",
+    phoneNumber: "",
+  });
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [formData, setFormData] = useState<Seller>({
     legalName: "",
@@ -48,13 +55,14 @@ const CreateSellerPage = () => {
     abn: "",
     mainNgr: "",
     additionalNgrs: [],
-    contactName: [],
+    contactName: [] as ContactDetails[], // Updated type
     email: "",
     phoneNumber: "",
     locationZone: [],
     accountNumber: "",
     authorityActFormPdf: "",
     authorityToAct: "",
+    bulkHandlerCredentials: [],
   });
 
   const uploadToCloudinary = async (file: File): Promise<string> => {
@@ -90,9 +98,7 @@ const CreateSellerPage = () => {
   const createSellerMutation = useMutation({
     mutationFn: createSeller,
     onSuccess: (data) => {
-      // Invalidate and refetch the sellers list
       queryClient.invalidateQueries({ queryKey: ["sellers"] });
-      // This provides instant feedback without waiting for refetch
       queryClient.setQueryData(["seller"], (oldData: Seller[] | undefined) => {
         if (oldData) {
           return [data, ...oldData];
@@ -103,9 +109,7 @@ const CreateSellerPage = () => {
       toast.success("Seller created successfully!");
       router.push("/dashboard/seller-management");
     },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    onError: (error: any) => {
-      console.error("Create seller error:", error);
+    onError: (error) => {
       toast.error(error?.message || "Failed to create seller");
     },
   });
@@ -143,10 +147,7 @@ const CreateSellerPage = () => {
     const { name, value } = e.target;
 
     if (name === "additionalNgrs") {
-      // Update the input display value
       setInputValue(value);
-
-      // Update the form data array
       setFormData((prev) => {
         const ngrArray = value
           .split(",")
@@ -168,25 +169,58 @@ const CreateSellerPage = () => {
       }));
     }
   };
-  const addContactName = () => {
-    if (
-      currentContactName.trim() &&
-      !formData.contactName.includes(currentContactName.trim())
-    ) {
-      setFormData((prev) => ({
-        ...prev,
-        contactName: [...prev.contactName, currentContactName.trim()],
-      }));
-      setCurrentContactName("");
-    } else if (formData.contactName.includes(currentContactName.trim())) {
-      toast.error("Contact name already exists");
-    }
+
+  // Handle contact detail changes
+  const handleContactChange = (field: keyof ContactDetails, value: string) => {
+    setCurrentContact((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
-  const removeContactName = (nameToRemove: string) => {
+  const addContactName = () => {
+    // Validate all fields are filled
+    if (
+      !currentContact.name.trim() ||
+      !currentContact.email.trim() ||
+      !currentContact.phoneNumber.trim()
+    ) {
+      toast.error(
+        "Please fill in all contact fields (name, email, and phone number)"
+      );
+      return;
+    }
+
+    // Check if contact with same email already exists
+    const emailExists = formData.contactName.some(
+      (contact) =>
+        contact.email.toLowerCase() === currentContact.email.toLowerCase()
+    );
+
+    if (emailExists) {
+      toast.error("Contact with this email already exists");
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      contactName: prev.contactName.filter((name) => name !== nameToRemove),
+      contactName: [...prev.contactName, currentContact],
+    }));
+
+    // Reset current contact
+    setCurrentContact({
+      name: "",
+      email: "",
+      phoneNumber: "",
+    });
+  };
+
+  const removeContactName = (emailToRemove: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      contactName: prev.contactName.filter(
+        (contact) => contact.email !== emailToRemove
+      ),
     }));
   };
 
@@ -196,27 +230,6 @@ const CreateSellerPage = () => {
       addContactName();
     }
   };
-  // const handleChange = (
-  //   e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  // ) => {
-  //   const { name, value } = e.target;
-
-  //   setFormData((prev) => {
-  //     // Special handling for additionalNgrs
-  //     if (name === "additionalNgrs") {
-  //       return {
-  //         ...prev,
-  //         [name]: value.split(", ").map((s) => s.trim()),
-  //       };
-  //     }
-
-  //     // Normal handling for other fields
-  //     return {
-  //       ...prev,
-  //       [name]: value,
-  //     };
-  //   });
-  // };
 
   const handleAuthorityActFormUpload = async (
     e: React.ChangeEvent<HTMLInputElement>
@@ -224,13 +237,11 @@ const CreateSellerPage = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (file.type !== "application/pdf") {
       toast.error("Please select a PDF file");
       return;
     }
 
-    // Validate file size (e.g., max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       toast.error("File size must be less than 10MB");
       return;
@@ -255,13 +266,11 @@ const CreateSellerPage = () => {
   const handleLocationZoneChange = (zone: string) => {
     setFormData((prev) => {
       if (prev.locationZone.includes(zone)) {
-        // Remove zone if already selected
         return {
           ...prev,
           locationZone: prev.locationZone.filter((z) => z !== zone),
         };
       } else {
-        // Add zone if not selected
         return {
           ...prev,
           locationZone: [...prev.locationZone, zone],
@@ -270,7 +279,6 @@ const CreateSellerPage = () => {
     });
   };
 
-  // Remove a single zone
   const removeZone = (zone: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -290,7 +298,6 @@ const CreateSellerPage = () => {
     );
   };
 
-  // Toggle password visibility for a specific row
   const togglePasswordVisibility = (index: number) => {
     setPasswordVisibility((prev) =>
       prev.map((visible, idx) => (idx === index ? !visible : visible))
@@ -300,18 +307,20 @@ const CreateSellerPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Basic validation
-    if (!formData.legalName || !formData.abn || !formData.contactName) {
+    if (
+      !formData.legalName ||
+      !formData.abn ||
+      formData.contactName.length === 0
+    ) {
       toast.error("Please fill in all required fields");
       return;
     }
 
     if (formData.contactName.length === 0) {
-      toast.error("Please add at least one contact name");
+      toast.error("Please add at least one contact");
       return;
     }
 
-    // Filter out credentials that have both identifier and password filled
     const validCredentials = bulkHandlerCredentials.filter(
       (cred) => cred.identifier.trim() !== "" && cred.password.trim() !== ""
     );
@@ -321,11 +330,9 @@ const CreateSellerPage = () => {
       bulkHandlerCredentials: validCredentials,
     };
 
-    // console.log("Submitting seller with credentials:", newSeller);
     createSellerMutation.mutate(newSeller);
   };
 
-  // Save credentials and close modal
   const saveCredentials = () => {
     const filledCredentials = bulkHandlerCredentials.filter(
       (cred) => cred.identifier.trim() !== "" || cred.password.trim() !== ""
@@ -341,8 +348,8 @@ const CreateSellerPage = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto mt-10 md:mt-32 px-4">
-      <Toaster/>
+    <div className="max-w-7xl mx-auto mt-10 md:mt-32 px-4 xl:overflow-scroll xl:h-[40rem] hide-scrollbar-xl">
+      <Toaster />
       <div className="flex justify-center">
         <div className="w-full max-w-4xl">
           {/* Header with Bulk Password Handler Button */}
@@ -407,51 +414,7 @@ const CreateSellerPage = () => {
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none"
                   />
                 </div>
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    SELLER CONTACT NAME *
-                  </label>
-                  <div className="mt-1 space-y-2">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={currentContactName}
-                        onChange={(e) => setCurrentContactName(e.target.value)}
-                        onKeyDown={handleKeyPress}
-                        placeholder="Enter contact name - Multi value input press Enter to add"
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A5D36] focus:border-transparent"
-                        disabled={createSellerMutation.isPending}
-                      />
-                    </div>
 
-                    {/* Display added contact names */}
-                    {formData.contactName.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {formData.contactName.map((name, index) => (
-                          <div
-                            key={index}
-                            className="bg-[#2A5D36] text-white px-3 py-1 rounded-full text-sm flex items-center gap-2"
-                          >
-                            <span>{name}</span>
-                            <button
-                              type="button"
-                              onClick={() => removeContactName(name)}
-                              className="text-white hover:text-gray-300 font-bold text-lg leading-none"
-                              disabled={createSellerMutation.isPending}
-                              style={{ fontSize: "14px" }}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 3 */}
-              <div className="flex flex-col md:flex-row gap-6">
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium text-gray-700">
                     SELLER EMAIL *
@@ -465,6 +428,10 @@ const CreateSellerPage = () => {
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none"
                   />
                 </div>
+              </div>
+
+              {/* Row 3 */}
+              <div className="flex flex-col md:flex-row gap-6">
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium text-gray-700">
                     SELLER PHONE NUMBER *
@@ -478,10 +445,7 @@ const CreateSellerPage = () => {
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none"
                   />
                 </div>
-              </div>
 
-              {/* Row 4 */}
-              <div className="flex flex-col md:flex-row gap-6">
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium text-gray-700">
                     SELLER MAIN NGR
@@ -494,7 +458,10 @@ const CreateSellerPage = () => {
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none"
                   />
                 </div>
+              </div>
 
+              {/* Row 4 */}
+              <div className="flex flex-col md:flex-row gap-6">
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     SELLER ADDITIONAL NGRS (comma separated)
@@ -508,16 +475,12 @@ const CreateSellerPage = () => {
                     placeholder="11, 22, 33"
                   />
                 </div>
-              </div>
 
-              {/* Row 5 - Location Zone and Account Number */}
-              <div className="flex flex-col md:flex-row gap-6">
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     SELLER LOCATION ZONE (Multiple Select)
                   </label>
                   <div className="relative" ref={dropdownRef}>
-                    {/* Dropdown Button with Selected Items Inside */}
                     <div
                       onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-[#2A5D36] focus:border-[#2A5D36] cursor-pointer min-h-[42px] flex items-center justify-between"
@@ -568,7 +531,6 @@ const CreateSellerPage = () => {
                       </svg>
                     </div>
 
-                    {/* Dropdown Menu */}
                     {isDropdownOpen && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
                         <div className="py-1">
@@ -603,7 +565,6 @@ const CreateSellerPage = () => {
                           ))}
                         </div>
 
-                        {/* Clear All & Select All Actions */}
                         <div className="border-t border-gray-200 px-3 py-2 bg-gray-50">
                           <div className="flex justify-between">
                             <button
@@ -636,7 +597,10 @@ const CreateSellerPage = () => {
                     )}
                   </div>
                 </div>
+              </div>
 
+              {/* Row 5 - Location Zone and Account Number */}
+              <div className="flex flex-col md:flex-row gap-6">
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium text-gray-700">
                     ACCOUNT NUMBER
@@ -650,31 +614,109 @@ const CreateSellerPage = () => {
                     placeholder=""
                   />
                 </div>
+                {/* Authority to Act Form */}
+                <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    AUTHORITY TO ACT (FORM)
+                  </label>
+                  <input
+                    type="file"
+                    name="authorityActFormPdf"
+                    disabled={uploadingAthAct}
+                    onChange={handleAuthorityActFormUpload}
+                    accept="application/pdf"
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none"
+                  />
+                  {uploadingAthAct && (
+                    <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                      <AiOutlineLoading3Quarters className="animate-spin text-gray-500" />
+                    </div>
+                  )}
+                </div>
               </div>
+            </div>
 
-              {/* Row 6 - Authority to Act Form */}
-              <div className="flex flex-col md:flex-row gap-6">
-                {
-                  <div className="w-full md:w-1/2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      AUTHORITY TO ACT (FORM)
-                    </label>
-                    <input
-                      type="file"
-                      name="authorityActFormPdf"
-                      disabled={uploadingAthAct}
-                      onChange={handleAuthorityActFormUpload}
-                      accept="application/pdf"
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none"
-                    />
-                    {uploadingAthAct && (
-                      <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                        <AiOutlineLoading3Quarters className="animate-spin text-gray-500" />
+            <div className="w-full border-t pt-6 mt-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                SELLER CONTACT DETAILS *
+              </label>
+              <div className="space-y-2">
+                {/* Contact Input Fields */}
+                <div className="space-y-2 p-3 border border-gray-200 rounded-md bg-gray-50">
+                  <input
+                    type="text"
+                    value={currentContact.name}
+                    onChange={(e) =>
+                      handleContactChange("name", e.target.value)
+                    }
+                    onKeyDown={handleKeyPress}
+                    placeholder="Contact Name"
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A5D36] focus:border-transparent text-sm"
+                    disabled={createSellerMutation.isPending}
+                  />
+                  <input
+                    type="email"
+                    value={currentContact.email}
+                    onChange={(e) =>
+                      handleContactChange("email", e.target.value)
+                    }
+                    onKeyDown={handleKeyPress}
+                    placeholder="Contact Email"
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A5D36] focus:border-transparent text-sm"
+                    disabled={createSellerMutation.isPending}
+                  />
+                  <input
+                    type="tel"
+                    value={currentContact.phoneNumber}
+                    onChange={(e) =>
+                      handleContactChange("phoneNumber", e.target.value)
+                    }
+                    onKeyDown={handleKeyPress}
+                    placeholder="Contact Phone Number"
+                    className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A5D36] focus:border-transparent text-sm"
+                    disabled={createSellerMutation.isPending}
+                  />
+                  <button
+                    type="button"
+                    onClick={addContactName}
+                    className="w-full bg-[#2A5D36] text-white px-3 py-2 rounded-md text-sm hover:bg-[#1e4728] transition-colors"
+                    disabled={createSellerMutation.isPending}
+                  >
+                    Add Contact
+                  </button>
+                </div>
+
+                {/* Display added contacts */}
+                {formData.contactName.length > 0 && (
+                  <div className="space-y-2 mt-3">
+                    {formData.contactName.map((contact, index) => (
+                      <div
+                        key={index}
+                        className="bg-white border border-gray-200 p-3 rounded-md flex justify-between items-start"
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium text-sm text-gray-900">
+                            {contact.name}
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            {contact.email}
+                          </div>
+                          <div className="text-xs text-gray-600">
+                            {contact.phoneNumber}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeContactName(contact.email)}
+                          className="text-red-500 hover:text-red-700 font-bold text-lg leading-none ml-2"
+                          disabled={createSellerMutation.isPending}
+                        >
+                          ×
+                        </button>
                       </div>
-                    )}
+                    ))}
                   </div>
-                }
-                <div className="w-full md:w-1/2"></div>
+                )}
               </div>
             </div>
 
@@ -702,9 +744,8 @@ const CreateSellerPage = () => {
 
       {/* Bulk Password Handler Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 my-8 max-h-[90vh] flex flex-col">
-            {/* Modal Header */}
             <div className="sticky top-0 bg-white p-4 flex justify-between items-center border-b rounded-t-lg">
               <h3 className="text-lg font-semibold text-gray-900">
                 Bulk Handler Passwords
@@ -781,7 +822,6 @@ const CreateSellerPage = () => {
                               className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
                             >
                               {passwordVisibility[idx] ? (
-                                // Eye slash icon (hide)
                                 <svg
                                   className="h-4 w-4"
                                   fill="none"
@@ -796,7 +836,6 @@ const CreateSellerPage = () => {
                                   />
                                 </svg>
                               ) : (
-                                // Eye icon (show)
                                 <svg
                                   className="h-4 w-4"
                                   fill="none"
@@ -827,7 +866,6 @@ const CreateSellerPage = () => {
               </div>
             </div>
 
-            {/* Modal Footer */}
             <div className="sticky bottom-0 bg-white p-4 flex justify-end gap-3 border-t rounded-b-lg">
               <button
                 onClick={() => setIsModalOpen(false)}

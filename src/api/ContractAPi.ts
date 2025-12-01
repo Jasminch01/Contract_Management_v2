@@ -25,7 +25,6 @@ export const fetchContracts = async (
   params: FetchContractsParams = {}
 ): Promise<ContractsPaginatedResponse> => {
   try {
-    // Build query parameters
     const queryParams = new URLSearchParams();
 
     Object.entries(params).forEach(([key, value]) => {
@@ -34,12 +33,10 @@ export const fetchContracts = async (
       }
     });
 
-    // ✅ Tell axios the response type
     const response: AxiosResponse<ContractsPaginatedResponse> = await instance.get(
       `contracts?${queryParams.toString()}`
     );
-
-    // ✅ Return just the data (typed)
+    console.log(response.data)
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -48,7 +45,6 @@ export const fetchContracts = async (
       console.error("Unexpected error fetching contracts:", error);
     }
 
-    // ✅ Return correct empty structure
     return {
       page: 1,
       totalPages: 0,
@@ -58,25 +54,8 @@ export const fetchContracts = async (
   }
 };
 
-
-// export const fetchContracts = async (): Promise<TContract[]> => {
-//   try {
-//     const { data } = await instance.get("contracts");
-//     return data;
-//   } catch (error) {
-//     if (axios.isAxiosError(error)) {
-//       console.error("Axios error fetching buyers:", error.message);
-//     } else {
-//       console.error("Unexpected error fetching buyers:", error);
-
-//     }
-//     return [];
-//   }
-// };
-
 //fetch contract
 export const fetchContract = async (id: string) => {
-  // console.log(Contract)
   try {
     const contract = await instance.get(`/contracts/${id}`);
     return contract;

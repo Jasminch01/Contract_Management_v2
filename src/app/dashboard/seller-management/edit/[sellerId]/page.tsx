@@ -1,5 +1,5 @@
 "use client";
-import { BulkHandlerCredential, Seller } from "@/types/types";
+import { BulkHandlerCredential, ContactDetails, Seller } from "@/types/types";
 import { useParams, useRouter } from "next/navigation";
 import React, { useState, useRef, useEffect } from "react";
 import {
@@ -7,9 +7,10 @@ import {
   MdCancel,
   MdKeyboardBackspace,
   MdDelete,
+  MdAdd,
 } from "react-icons/md";
 import { AiOutlineLoading3Quarters } from "react-icons/ai";
-import toast from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import { getseller, updateSeller } from "@/api/sellerApi";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -55,7 +56,12 @@ const SellerInformationEditPage = () => {
   const authorityFileInputRef = useRef<HTMLInputElement>(null);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const [currentContactName, setCurrentContactName] = useState("");
+  // Replace the currentContactName state with:
+  const [newContact, setNewContact] = useState<ContactDetails>({
+    name: "",
+    email: "",
+    phoneNumber: "",
+  });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [ngrInputValue, setNgrInputValue] = useState("");
@@ -248,22 +254,20 @@ const SellerInformationEditPage = () => {
   // Initialize data when fetched
   useEffect(() => {
     if (fetchSellerData) {
-      // Fix: Ensure proper initialization with default values
       const initializedData = {
         ...fetchSellerData,
         locationZone: fetchSellerData.locationZone || [],
         additionalNgrs: fetchSellerData.additionalNgrs || [],
         accountNumber: fetchSellerData.accountNumber || "",
-        contactName:
-          fetchSellerData.contactName || fetchSellerData.legalName || "",
+        contactName: Array.isArray(fetchSellerData.contactName) // Changed from contactName
+          ? fetchSellerData.contactName
+          : [],
         bulkHandlerCredentials: fetchSellerData.bulkHandlerCredentials || [],
-        authorityActFormPdf: fetchSellerData.authorityActFormPdf || "", // Add this field
+        authorityActFormPdf: fetchSellerData.authorityActFormPdf || "",
       };
 
       setSellerData(initializedData);
       setOriginalSellerData(initializedData);
-
-      // Initialize NGR input value
       if (
         initializedData.additionalNgrs &&
         initializedData.additionalNgrs.length > 0
@@ -435,47 +439,97 @@ const SellerInformationEditPage = () => {
     router.back();
   };
 
-  const addContactName = () => {
-    if (
-      currentContactName.trim() &&
-      !sellerData?.contactName.includes(currentContactName.trim())
-    ) {
-      setSellerData((prev) => {
-        if (!prev) return prev;
-        const updated = {
-          ...prev,
-          contactName: [...prev.contactName, currentContactName.trim()],
-        };
-        setHasChanges(checkForChanges(updated));
-        return updated;
-      });
-      setCurrentContactName("");
-    } else if (sellerData?.contactName.includes(currentContactName.trim())) {
-      toast.error("Contact name already exists");
-    }
+  const handleNewContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setNewContact((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
-  const removeContactName = (nameToRemove: string) => {
+  const addContact = () => {
+    if (!newContact.name.trim()) {
+      toast.error("Contact name is required");
+      return;
+    }
+
+    const contactExists = sellerData?.contactName.some(
+      (contact) => contact.email.toLowerCase() === newContact.email.toLowerCase()
+    );
+
+    if (contactExists) {
+      toast.error("Contact email already exists");
+      return;
+    }
+
     setSellerData((prev) => {
       if (!prev) return prev;
       const updated = {
         ...prev,
-        contactName: prev.contactName.filter((name) => name !== nameToRemove),
+        contactName: [...prev.contactName, { ...newContact }], // Use contactName
+      };
+      setHasChanges(checkForChanges(updated));
+      return updated;
+    });
+
+    setNewContact({
+      name: "",
+      email: "",
+      phoneNumber: "",
+    });
+    toast.success("Contact added");
+  };
+
+  const removeContact = (index: number) => {
+    setSellerData((prev) => {
+      if (!prev) return prev;
+      const updated = {
+        ...prev,
+        contactName: prev.contactName.filter((_, i) => i !== index), // Use contactName
+      };
+      setHasChanges(checkForChanges(updated));
+      return updated;
+    });
+    toast.success("Contact removed");
+  };
+
+  const updateContact = (
+    index: number,
+    field: keyof ContactDetails,
+    value: string
+  ) => {
+    setSellerData((prev) => {
+      if (!prev) return prev;
+      const updatedContacts = [...prev.contactName]; // Use contactName
+      updatedContacts[index] = {
+        ...updatedContacts[index],
+        [field]: value,
+      };
+      const updated = {
+        ...prev,
+        contactName: updatedContacts, // Use contactName
       };
       setHasChanges(checkForChanges(updated));
       return updated;
     });
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      addContactName();
-    }
-  };
-
   const handleSave = async () => {
     if (!sellerData || !sellerIdStr) return;
+
+    // Validate contacts
+    if (!sellerData.contactName || sellerData.contactName.length === 0) {
+      toast.error("Please add at least one contact");
+      return;
+    }
+
+    const invalidContact = sellerData.contactName.find(
+      (contact) => !contact.name.trim()
+    );
+    if (invalidContact) {
+      toast.error("All contacts must have a name");
+      return;
+    }
 
     // Filter out credentials that have both identifier and password filled
     const validCredentials = bulkHandlerCredentials.filter(
@@ -487,10 +541,8 @@ const SellerInformationEditPage = () => {
       bulkHandlerCredentials: validCredentials,
     };
 
-    // console.log("Updating seller with data:", sellerDataWithCredentials);
     updateSellerMutation.mutate(sellerDataWithCredentials);
   };
-
   // Save credentials and close modal
   const saveCredentials = () => {
     const filledCredentials = bulkHandlerCredentials.filter(
@@ -576,6 +628,7 @@ const SellerInformationEditPage = () => {
 
   return (
     <div>
+      <Toaster/>
       <div className="border-b border-gray-300 py-10">
         <div className="mx-auto max-w-6xl flex justify-between items-center px-4">
           <div className="flex items-center gap-5">
@@ -597,7 +650,7 @@ const SellerInformationEditPage = () => {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl mt-10 px-4">
+      <div className="mx-auto max-w-6xl mt-10 px-4 xl:overflow-scroll xl:h-[38rem] hide-scrollbar-xl">
         <div className="flex flex-col items-center mx-auto max-w-6xl w-full mt-10">
           <div className="grid grid-cols-1 md:grid-cols-2 w-full border border-gray-300 rounded-md p-6 gap-5 bg-white">
             <Field
@@ -624,53 +677,7 @@ const SellerInformationEditPage = () => {
               value={sellerData?.mainNgr || ""}
               onChange={handleInputChange}
             />
-            <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">
-                Contact Name *
-              </label>
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={currentContactName}
-                    onChange={(e) => setCurrentContactName(e.target.value)}
-                    onKeyDown={handleKeyPress}
-                    placeholder="Enter contact name - Multi value input press Enter to add"
-                    className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:border-green-700"
-                    disabled={updateSellerMutation.isPending}
-                  />
-                </div>
 
-                {/* Display added contact names */}
-                {sellerData?.contactName &&
-                  sellerData.contactName.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {sellerData.contactName.map((name, index) => (
-                        <div
-                          key={index}
-                          className="bg-[#2A5D36] text-white px-3 py-1 rounded-full text-sm flex items-center gap-2"
-                        >
-                          <span>{name}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeContactName(name)}
-                            className="text-white hover:text-gray-300 font-bold text-lg leading-none"
-                            disabled={updateSellerMutation.isPending}
-                            style={{ fontSize: "14px" }}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                {sellerData.contactName.length === 0 && (
-                  <p className="text-red-500 text-xs">
-                    At least one contact name is required
-                  </p>
-                )}
-              </div>
-            </div>
             <Field
               label="Email"
               name="email"
@@ -884,6 +891,157 @@ const SellerInformationEditPage = () => {
                 </div>
               )}
             </div>
+
+            {/* Contacts Section */}
+            <div className="md:col-span-2">
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Contact Information *
+              </label>
+
+              {/* Existing Contacts */}
+              {sellerData?.contactName && sellerData.contactName.length > 0 && (
+                <div className="space-y-3 mb-4">
+                  {sellerData.contactName.map((contact, index) => (
+                    <div
+                      key={index}
+                      className="border border-gray-200 rounded-md p-3 bg-gray-50"
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-medium text-gray-700 text-sm">
+                          Contact {index + 1}
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => removeContact(index)}
+                          disabled={updateSellerMutation.isPending}
+                          className="text-red-500 hover:text-red-700 disabled:opacity-50"
+                        >
+                          <MdDelete size={18} />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 mb-1 block">
+                            Name *
+                          </label>
+                          <input
+                            type="text"
+                            value={contact.name}
+                            onChange={(e) =>
+                              updateContact(index, "name", e.target.value)
+                            }
+                            disabled={updateSellerMutation.isPending}
+                            className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-green-700"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 mb-1 block">
+                            Email
+                          </label>
+                          <input
+                            type="email"
+                            value={contact.email}
+                            onChange={(e) =>
+                              updateContact(index, "email", e.target.value)
+                            }
+                            disabled={updateSellerMutation.isPending}
+                            className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-green-700"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-600 mb-1 block">
+                            Phone Number
+                          </label>
+                          <input
+                            type="text"
+                            value={contact.phoneNumber}
+                            onChange={(e) =>
+                              updateContact(
+                                index,
+                                "phoneNumber",
+                                e.target.value
+                              )
+                            }
+                            disabled={updateSellerMutation.isPending}
+                            className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-green-700"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add New Contact Form */}
+              <div className="border-2 border-dashed border-gray-300 rounded-md p-3 bg-gray-50">
+                <h4 className="font-medium text-gray-700 mb-3 text-sm">
+                  Add New Contact
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">
+                      Name *
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={newContact.name}
+                      onChange={handleNewContactChange}
+                      disabled={updateSellerMutation.isPending}
+                      placeholder="Contact name"
+                      className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-green-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={newContact.email}
+                      onChange={handleNewContactChange}
+                      disabled={updateSellerMutation.isPending}
+                      placeholder="Contact email"
+                      className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-green-700"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">
+                      Phone Number
+                    </label>
+                    <input
+                      type="text"
+                      name="phoneNumber"
+                      value={newContact.phoneNumber}
+                      onChange={handleNewContactChange}
+                      disabled={updateSellerMutation.isPending}
+                      placeholder="Contact phone"
+                      className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-green-700"
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={addContact}
+                  disabled={
+                    updateSellerMutation.isPending || !newContact.name.trim()
+                  }
+                  className="w-full md:w-auto px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+                >
+                  <MdAdd size={18} />
+                  Add Contact
+                </button>
+              </div>
+
+              {(!sellerData?.contactName ||
+                sellerData.contactName.length === 0) && (
+                <p className="text-red-500 text-xs mt-2">
+                  At least one contact is required
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Action Buttons */}
@@ -899,7 +1057,11 @@ const SellerInformationEditPage = () => {
               </button>
               <button
                 onClick={handleSave}
-                disabled={saveStatus === "saving" || uploadingAuthorityPdf || sellerData.contactName.length ===0}
+                disabled={
+                  saveStatus === "saving" ||
+                  uploadingAuthorityPdf ||
+                  sellerData.contactName.length === 0
+                }
                 className="py-2 px-5 bg-[#2A5D36] text-white rounded flex items-center gap-2 hover:bg-[#1e4a2a] transition-colors disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
               >
                 <MdSave className="text-lg" />

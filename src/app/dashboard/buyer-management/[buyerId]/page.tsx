@@ -1,5 +1,5 @@
 "use client";
-import { Buyer } from "@/types/types";
+import { Buyer, ContactDetails } from "@/types/types";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import React from "react";
@@ -174,7 +174,7 @@ const BuyerInformationPage = () => {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-6xl xl:overflow-scroll xl:h-[38rem] hide-scrollbar-xl">
         <div className="my-10 text-center">
           <h2 className="text-2xl font-semibold">{buyerData.name}</h2>
           {isFetching && (
@@ -184,39 +184,78 @@ const BuyerInformationPage = () => {
           )}
         </div>
 
-        <div className="flex flex-col items-center w-full">
-          <div className="grid grid-cols-2 w-full border border-gray-300 rounded-md overflow-hidden">
-            {/* Information Rows */}
-            {[
-              { label: "Legal Name", value: buyerData.name },
-              { label: "ABN", value: buyerData.abn },
-              { label: "Email", value: buyerData.email },
-              { label: "Office Address", value: buyerData.officeAddress },
-              {
-                label: "Contact Names",
-                value: Array.isArray(buyerData.contactName)
-                  ? buyerData.contactName.join(", ")
-                  : buyerData.contactName,
-              },
-              { label: "Phone Number", value: buyerData.phoneNumber },
-              {
-                label: "Account Number",
-                value: buyerData?.accountNumber || "",
-              },
-            ].map((item, index) => (
-              <React.Fragment key={index}>
-                <div className="border-b border-r border-gray-300 p-4 bg-gray-50 text-gray-700 font-medium">
-                  {item.label}
-                </div>
-                <div className="border-b border-gray-300 p-4">
-                  {item.value || "-"}
-                </div>
-              </React.Fragment>
-            ))}
+        <div className="flex flex-col items-center w-full gap-6">
+          {/* Main Buyer Information */}
+          <div className="w-full border border-gray-300 rounded-md overflow-hidden">
+            <div className="bg-gray-100 border-b border-gray-300 p-3">
+              <h3 className="font-semibold text-gray-700">General Information</h3>
+            </div>
+            <div className="grid grid-cols-2">
+              {[
+                { label: "Legal Name", value: buyerData.name },
+                { label: "ABN", value: buyerData.abn },
+                { label: "Office Address", value: buyerData.officeAddress },
+                { label: "Account Number", value: buyerData.accountNumber },
+                { label: "Email", value: buyerData.email },
+                { label: "Phone Number", value: buyerData.phoneNumber },
+              ].map((item, index) => (
+                <React.Fragment key={index}>
+                  <div className="border-b border-r border-gray-300 p-4 bg-gray-50 text-gray-700 font-medium">
+                    {item.label}
+                  </div>
+                  <div className="border-b border-gray-300 p-4">
+                    {item.value || "-"}
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
           </div>
 
+          {/* Contacts Information */}
+          {buyerData.contacts && buyerData.contacts.length > 0 && (
+            <div className="w-full border border-gray-300 rounded-md overflow-hidden">
+              <div className="bg-gray-100 border-b border-gray-300 p-3">
+                <h3 className="font-semibold text-gray-700">
+                  Contact Information ({buyerData.contacts.length})
+                </h3>
+              </div>
+              <div className="divide-y divide-gray-300">
+                {buyerData.contacts.map((contact: ContactDetails, index: number) => (
+                  <div key={index} className="p-4 hover:bg-gray-50">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-xs text-gray-500 uppercase mb-1">Contact Name</p>
+                        <p className="font-medium text-gray-900">{contact.name}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 uppercase mb-1">Email</p>
+                        <p className="text-gray-900">{contact.email || "-"}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 uppercase mb-1">Phone Number</p>
+                        <p className="text-gray-900">{contact.phoneNumber || "-"}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* No contacts message */}
+          {(!buyerData.contacts || buyerData.contacts.length === 0) && (
+            <div className="w-full border border-gray-300 rounded-md overflow-hidden">
+              <div className="bg-gray-100 border-b border-gray-300 p-3">
+                <h3 className="font-semibold text-gray-700">Contact Information</h3>
+              </div>
+              <div className="p-8 text-center text-gray-500">
+                <p>No contact information available</p>
+              </div>
+            </div>
+          )}
+
           {/* Action Buttons */}
-          <div className="mt-10 flex gap-3">
+          <div className="mt-4 flex gap-3">
             <button
               onClick={handleRefresh}
               disabled={isFetching}

@@ -24,14 +24,8 @@ interface PaginationState {
 
 const columns = [
   {
-    name: "DATE",
-    selector: (row: TContract) => {
-      if (!row?.createdAt) return "";
-      const date = new Date(row.contractDate || row.createdAt);
-      return date.toLocaleDateString();
-    },
-    sortable: true,
-    sortField: "contractDate",
+    name: "Invoice No",
+    selector: (row: TContract) => row?.xeroInvoiceNumber || "",
     width: "120px",
   },
   {
@@ -126,11 +120,12 @@ const customStyles = {
   },
   headCells: {
     style: {
-      // borderRight: "1px solid #ddd",
+      borderRight: "1px solid #ddd",
       fontWeight: "bold",
       color: "#6B7280",
-      padding: "12px",
-      backgroundColor: "#F9FAFB",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
     },
   },
 };
@@ -339,9 +334,18 @@ const ContractManagementPage = () => {
       return;
     }
 
-    // Implement Xero integration logic here
-    alert(`Opening ${selectedRows.length} contract(s) in Xero...`);
-    console.log("Selected contracts for Xero:", selectedRows);
+    selectedRows.forEach((row: TContract) => {
+      if (!row?.xeroInvoiceId) {
+        console.warn(`Contract ${row.contractNumber} has no Xero Invoice ID`);
+        return;
+      }
+
+      // ✅ Xero invoice direct URL
+      const invoiceUrl = `https://go.xero.com/AccountsReceivable/View.aspx?InvoiceID=${row.xeroInvoiceId}`;
+
+      // ✅ Open in a new tab
+      window.open(invoiceUrl, "_blank");
+    });
   };
 
   const hasActiveFilters =

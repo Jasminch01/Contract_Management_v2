@@ -23,7 +23,12 @@ import {
 
 import { IoReceiptOutline } from "react-icons/io5";
 import { MdCheckCircle } from "react-icons/md";
-import axios from "axios";
+import {
+  authorizeXero,
+  createXeroInvoice,
+  getXeroConnectionStatus,
+} from "@/api/xeroApi";
+import { GiPaperClip } from "react-icons/gi";
 
 // Types for pagination parameters
 interface PaginationState {
@@ -34,6 +39,38 @@ interface PaginationState {
   sortBy: string;
   sortOrder: "asc" | "desc";
 }
+
+// LocalStorage key for persisting filters
+const FILTER_STORAGE_KEY = "contract_management_filters";
+
+// Helper functions for localStorage
+const saveFiltersToStorage = (state: PaginationState) => {
+  try {
+    localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(state));
+  } catch (error) {
+    console.error("Error saving filters to localStorage:", error);
+  }
+};
+
+const loadFiltersFromStorage = (): Partial<PaginationState> | null => {
+  try {
+    const stored = localStorage.getItem(FILTER_STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.error("Error loading filters from localStorage:", error);
+  }
+  return null;
+};
+
+const clearFiltersFromStorage = () => {
+  try {
+    localStorage.removeItem(FILTER_STORAGE_KEY);
+  } catch (error) {
+    console.error("Error clearing filters from localStorage:", error);
+  }
+};
 
 const columns = [
   {
@@ -71,6 +108,24 @@ const columns = [
     sortField: "seller.legalName",
   },
   {
+    name: "SELLER ATTACHMENT",
+    cell: (row: TContract) =>
+      row?.attachedSellerContract ? (
+        <a
+          href={row.attachedSellerContract}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-blue-600 hover:underline"
+        >
+          <GiPaperClip size={16} /> View
+        </a>
+      ) : (
+        <span className="text-gray-400">N/A</span>
+      ),
+    sortable: true,
+    sortField: "seller.legalName",
+  },
+  {
     name: "GRADE",
     selector: (row: TContract) => row?.grade || "",
     sortable: true,
@@ -87,6 +142,24 @@ const columns = [
     selector: (row: TContract) => row?.buyer?.name || "",
     sortable: true,
     sortField: "buyer.name",
+  },
+  {
+    name: "BUYER ATTACHMENT",
+    cell: (row: TContract) =>
+      row?.attachedBuyerContract ? (
+        <a
+          href={row.attachedBuyerContract}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-blue-600 hover:underline"
+        >
+          <GiPaperClip size={16} /> View
+        </a>
+      ) : (
+        <span className="text-gray-400">N/A</span>
+      ),
+    sortable: true,
+    sortField: "seller.legalName",
   },
   {
     name: "DESTINATION",
@@ -141,6 +214,9 @@ const customStyles = {
     style: {
       borderRight: "1px solid #ddd",
       padding: "12px",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
     },
   },
   headCells: {
@@ -149,6 +225,9 @@ const customStyles = {
       fontWeight: "bold",
       color: "gray",
       padding: "12px",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
     },
   },
 };
@@ -173,15 +252,35 @@ const ContractManagementPage = () => {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isFilterActive, setIsFilterActive] = useState(false);
   const [toggleCleared, setToggleCleared] = useState(false);
-  // Pagination state
-  const [paginationState, setPaginationState] = useState<PaginationState>({
-    page: 1,
-    limit: 10,
-    searchFilters: {},
-    status: "",
-    sortBy: "",
-    sortOrder: "asc",
-  });
+
+  // Initialize pagination state with stored filters
+  const getInitialPaginationState = (): PaginationState => {
+    const storedFilters = loadFiltersFromStorage();
+
+    if (storedFilters) {
+      return {
+        page: storedFilters.page || 1,
+        limit: storedFilters.limit || 10,
+        searchFilters: storedFilters.searchFilters || {},
+        status: storedFilters.status || "",
+        sortBy: storedFilters.sortBy || "",
+        sortOrder: storedFilters.sortOrder || "asc",
+      };
+    }
+
+    return {
+      page: 1,
+      limit: 10,
+      searchFilters: {},
+      status: "",
+      sortBy: "",
+      sortOrder: "asc",
+    };
+  };
+
+  const [paginationState, setPaginationState] = useState<PaginationState>(
+    getInitialPaginationState
+  );
 
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [invoiceFormData, setInvoiceFormData] = useState({
@@ -191,110 +290,547 @@ const ContractManagementPage = () => {
     notes: "",
   });
 
-  const createInvoiceMutation = useMutation({
-    mutationFn: async (data: {
-      contractId: string;
-      invoiceDate: string;
-      dueDate: string;
-      reference: string;
-      notes: string;
-    }) => {
-      const response = await axios.post("/api/xero/create-invoice", data);
+  const [xeroStatus, setXeroStatus] = useState<{
+    isConnected: boolean;
+    tenantName: string | null; // ✅ CORRECT
+    isChecking: boolean;
+  }>({
+    isConnected: false,
+    tenantName: null,
+    isChecking: false,
+  });
+  // Save filters to localStorage whenever pagination state changes
+  useEffect(() => {
+    if (isMounted) {
+      saveFiltersToStorage(paginationState);
+    }
+  }, [paginationState, isMounted]);
 
-      return response.data;
+  // Check Xero connection status on mount
+  useEffect(() => {
+    const checkXeroStatus = async () => {
+      try {
+        setXeroStatus((prev) => ({ ...prev, isChecking: true }));
+        const status = await getXeroConnectionStatus();
+
+        setXeroStatus({
+          isConnected: status?.connected,
+          tenantName: status?.tenantName || null,
+          isChecking: false,
+        });
+      } catch (error) {
+        console.error("Error checking Xero status:", error);
+        setXeroStatus({
+          isConnected: false,
+          tenantName: null,
+          isChecking: false,
+        });
+      }
+    };
+
+    if (isMounted) {
+      checkXeroStatus();
+    }
+  }, [isMounted]);
+
+  //mutation for creating invoice ( multiple contracts)
+  const createInvoiceMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const result = await createXeroInvoice(data);
+      return result;
     },
-    onSuccess: (data) => {
+
+    onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ["contracts"] });
+
+      // Refresh Xero status after successful invoice creation
+      getXeroConnectionStatus().then((status) => {
+        setXeroStatus({
+          isConnected: status.connected,
+          tenantName: status.tenantName || null,
+          isChecking: false,
+        });
+      });
+
       setIsInvoiceModalOpen(false);
       setSelectedRows([]);
       setToggleCleared((prev) => !prev);
 
+      // Check if it was an update or creation
+      const isUpdate = response?.isUpdate || false;
       toast.success(
         <div>
-          <p>Invoice created successfully!</p>
-          <a
-            href={data.xeroUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 underline text-sm"
-          >
-            View in Xero
-          </a>
-        </div>
+          <p className="font-semibold">
+            Invoice {isUpdate ? "updated" : "created"} successfully
+          </p>
+        </div>,
+        { duration: 5000 }
       );
     },
-    onError: (error: any) => {
+
+    onError: async (error: any) => {
       console.error("Error creating invoice:", error);
+
+      const errorData = error.response?.data || error;
       const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to create invoice";
-      toast.error(errorMessage);
+        errorData.message || error.message || "Failed to create invoice";
+      const requiresReconnection = errorData.requiresReconnection || false;
+      const errorCode = errorData.error;
+
+      // Handle token expiration - automatically reconnect
+      if (
+        requiresReconnection ||
+        errorCode === "TOKEN_EXPIRED" ||
+        errorCode === "REFRESH_TOKEN_EXPIRED" ||
+        errorCode === "AUTHENTICATION_ERROR" ||
+        errorCode === "NO_CREDENTIALS" ||
+        errorMessage.includes("expired") ||
+        errorMessage.includes("reconnect")
+      ) {
+        toast.dismiss();
+
+        // Show reconnection in progress
+        toast.loading("Xero session expired. Reconnecting...", {
+          duration: 3000,
+        });
+
+        try {
+          // Reset connection status
+          setXeroStatus({
+            isConnected: false,
+            tenantName: null,
+            isChecking: false,
+          });
+
+          // Wait a moment for the toast to show
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          // Attempt automatic reconnection
+          const authorized = await authorizeXero();
+          toast.dismiss();
+
+          if (!authorized) {
+            toast.error(
+              <div>
+                <p className="font-semibold">Reconnection Failed</p>
+                <p className="text-sm mt-1">
+                  Please try creating the invoice again to reconnect.
+                </p>
+              </div>,
+              { duration: 5000 }
+            );
+            return;
+          }
+
+          // Verify the new connection
+          const newStatus = await getXeroConnectionStatus();
+
+          setXeroStatus({
+            isConnected: newStatus.connected,
+            tenantName: newStatus.tenantName || null,
+            isChecking: false,
+          });
+
+          if (newStatus.connected && newStatus.tenantName) {
+            toast.success(
+              <div>
+                <p className="font-semibold">Reconnected to Xero!</p>
+                <p className="text-sm mt-1">
+                  Please click &quot;Create Invoice&quot; again to proceed.
+                </p>
+              </div>,
+              { duration: 5000 }
+            );
+          } else {
+            toast.error("Failed to verify Xero connection. Please try again.");
+          }
+        } catch (reconnectError: any) {
+          toast.dismiss();
+          console.error("Auto-reconnection failed:", reconnectError);
+
+          toast.error(
+            <div>
+              <p className="font-semibold">Unable to Reconnect</p>
+              <p className="text-sm mt-1">
+                {reconnectError.message ||
+                  "Please try clicking 'Create Invoice' again."}
+              </p>
+            </div>,
+            { duration: 6000 }
+          );
+        }
+      } else {
+        // Other errors
+        toast.error(errorMessage, { duration: 4000 });
+      }
     },
   });
 
-  // const handleCreateInvoice = () => {
-  //   if (selectedRows.length !== 1) {
-  //     toast.error("Please select exactly one contract to create invoice");
-  //     return;
-  //   }
+  // Group contracts by invoice recipient (based on brokeragePayableBy)
+  const groupContractsByInvoiceRecipient = (contracts: TContract[]) => {
+    const groups: { [key: string]: TContract[] } = {};
 
-  //   const contract = selectedRows[0];
+    contracts.forEach((contract) => {
+      const brokeragePayableBy =
+        contract.brokeragePayableBy?.toLowerCase().trim() || "buyer";
 
-  //   // Validation checks
-  //   if (!contract?._id) {
-  //     toast.error("Selected contract is invalid");
-  //     return;
-  //   }
+      let recipientKey = "";
 
-  //   if (contract.status?.toLowerCase() === "draft") {
-  //     toast.error("Cannot create invoice for draft contracts");
-  //     return;
-  //   }
+      // Determine the invoice recipient based on brokeragePayableBy
+      if (brokeragePayableBy.includes("seller")) {
+        // If seller pays (fully or partially), group by seller
+        // Use email as primary key, fallback to legal name
+        const sellerEmail = contract.seller?.email?.toLowerCase().trim() || "";
+        const sellerName = contract.seller?.legalName?.trim() || "";
 
-  //   // if (contract.xeroInvoiceId) {
-  //   //   toast.error("Invoice already exists for this contract");
-  //   //   return;
-  //   // }
+        // Create a consistent key using email (preferred) or name
+        const sellerIdentifier = sellerEmail || sellerName;
+        recipientKey = `seller|${sellerIdentifier}`;
+      } else {
+        // If buyer pays, group by buyer
+        // Use email as primary key, fallback to name
+        const buyerEmail = contract.buyer?.email?.toLowerCase().trim() || "";
+        const buyerName = contract.buyer?.name?.trim() || "";
 
-  //   if (!contract.buyer?.name || !contract.buyer?.email) {
-  //     toast.error("Buyer information is incomplete");
-  //     return;
-  //   }
+        // Create a consistent key using email (preferred) or name
+        const buyerIdentifier = buyerEmail || buyerName;
+        recipientKey = `buyer|${buyerIdentifier}`;
+      }
 
-  //   // Set default due date (30 days from invoice date)
-  //   const defaultDueDate = new Date();
-  //   defaultDueDate.setDate(defaultDueDate.getDate() + 30);
+      // Initialize group if it doesn't exist
+      if (!groups[recipientKey]) {
+        groups[recipientKey] = [];
+      }
 
-  //   setInvoiceFormData({
-  //     invoiceDate: new Date().toISOString().split("T")[0],
-  //     dueDate: defaultDueDate.toISOString().split("T")[0],
-  //     reference: `${contract.contractNumber} - ${contract.seller?.legalName}`,
-  //     notes: contract.notes || "",
-  //   });
+      groups[recipientKey].push(contract);
+    });
 
-  //   setIsInvoiceModalOpen(true);
-  // };
+    return groups;
+  };
 
-  const confirmCreateInvoice = () => {
-    const contract = selectedRows[0];
+  const handleCreateInvoice = async () => {
+    if (selectedRows.length === 0) {
+      toast.error("Please select at least one contract to create invoice");
+      return;
+    }
 
+    // Filter out contracts that are not completed or invoiced
+    const allowedStatuses = ["complete", "invoiced"];
+
+    const invalidContracts = selectedRows.filter(
+      (contract) =>
+        !contract?._id ||
+        !allowedStatuses.includes(contract.status?.toLowerCase()) ||
+        !contract.buyer?.name ||
+        !contract.buyer?.email
+    );
+
+    if (invalidContracts.length > 0) {
+      const issues = [];
+
+      if (invalidContracts.some((c) => !c?._id)) {
+        issues.push("invalid contract data");
+      }
+
+      const invalidStatusContracts = invalidContracts.filter(
+        (c) => !allowedStatuses.includes(c.status?.toLowerCase())
+      );
+
+      if (invalidStatusContracts.length > 0) {
+        const statusList = invalidStatusContracts
+          .map((c) => `${c.contractNumber} (${c.status || "unknown"})`)
+          .join(", ");
+        issues.push(`invalid status: ${statusList}`);
+      }
+
+      if (invalidContracts.some((c) => !c.buyer?.name || !c.buyer?.email)) {
+        issues.push("incomplete buyer information");
+      }
+
+      toast.error(
+        `Cannot create invoice: ${issues.join(
+          "; "
+        )}. Only completed or invoiced contracts can be invoiced.`,
+        { duration: 6000 }
+      );
+      return;
+    }
+
+    const contractGroups = groupContractsByInvoiceRecipient(selectedRows);
+    const groupCount = Object.keys(contractGroups).length;
+
+    if (groupCount > 1) {
+      toast.loading(
+        `Selected contracts will be split into ${groupCount} separate invoices based on invoice recipient and payment terms.`,
+        { duration: 6000 }
+      );
+    }
+
+    try {
+      // Check current connection status
+      const status = await getXeroConnectionStatus();
+
+      console.log("Xero Status:", status);
+
+      // If not connected, automatically initiate connection
+      if (!status.connected || !status.tenantName) {
+        toast.loading("Connecting to Xero...");
+
+        try {
+          const authorized = await authorizeXero();
+          toast.dismiss();
+
+          if (!authorized) {
+            toast.error("Xero authorization failed. Please try again.");
+            return;
+          }
+
+          // Verify connection after authorization
+          const newStatus = await getXeroConnectionStatus();
+
+          console.log("New Xero Status:", newStatus);
+
+          setXeroStatus({
+            isConnected: newStatus.connected,
+            tenantName: newStatus.tenantName || null,
+            isChecking: false,
+          });
+
+          if (!newStatus.connected || !newStatus.tenantName) {
+            toast.error(
+              "Xero connection verification failed. Please try again."
+            );
+            return;
+          }
+
+          toast.success(
+            `Xero connected successfully to ${newStatus.tenantName}!`
+          );
+        } catch (error: any) {
+          toast.dismiss();
+          toast.error(error.message || "Failed to connect to Xero");
+          return;
+        }
+      } else {
+        // Already connected, update UI state
+        setXeroStatus({
+          isConnected: true,
+          tenantName: status.tenantName,
+          isChecking: false,
+        });
+      }
+
+      // Prepare invoice form data
+      const defaultDueDate = new Date();
+      defaultDueDate.setDate(defaultDueDate.getDate() + 30);
+
+      const firstContract = selectedRows[0];
+      const reference =
+        selectedRows.length === 1
+          ? `${firstContract.contractNumber} - ${firstContract.seller?.legalName}`
+          : `Brokerage Invoice - ${selectedRows.length} contracts`;
+
+      const combinedNotes = selectedRows
+        .map((c) => c.notes)
+        .filter((note) => note && note.trim())
+        .join("\n---\n");
+
+      setInvoiceFormData({
+        invoiceDate: new Date().toISOString().split("T")[0],
+        dueDate: defaultDueDate.toISOString().split("T")[0],
+        reference: reference,
+        notes: combinedNotes || "",
+      });
+
+      setIsInvoiceModalOpen(true);
+    } catch (error: any) {
+      console.error("Error in handleCreateInvoice:", error);
+      toast.error(error.message || "Failed to verify Xero connection");
+    }
+  };
+
+  const confirmCreateInvoice = async () => {
     if (!invoiceFormData.dueDate) {
       toast.error("Please select a due date");
       return;
     }
 
-    createInvoiceMutation.mutate({
-      contractId: contract._id!,
-      invoiceDate: invoiceFormData.invoiceDate,
-      dueDate: invoiceFormData.dueDate,
-      reference: invoiceFormData.reference,
-      notes: invoiceFormData.notes,
-    });
+    // Check connection status before proceeding
+    try {
+      const currentStatus = await getXeroConnectionStatus();
+
+      if (!currentStatus.connected || !currentStatus.tenantName) {
+        toast.loading("Xero not connected. Connecting now...");
+
+        try {
+          const authorized = await authorizeXero();
+          toast.dismiss();
+
+          if (!authorized) {
+            toast.error("Failed to connect to Xero. Please try again.");
+            return;
+          }
+
+          const newStatus = await getXeroConnectionStatus();
+
+          setXeroStatus({
+            isConnected: newStatus.connected,
+            tenantName: newStatus.tenantName || null,
+            isChecking: false,
+          });
+
+          if (!newStatus.connected || !newStatus.tenantName) {
+            toast.error("Connection verification failed. Please try again.");
+            return;
+          }
+
+          toast.success(`Connected to Xero: ${newStatus.tenantName}`);
+        } catch (connectError: any) {
+          toast.dismiss();
+          toast.error(connectError.message || "Failed to connect to Xero");
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Error checking Xero status:", error);
+    }
+
+    const contractGroups = groupContractsByInvoiceRecipient(selectedRows);
+    const groupKeys = Object.keys(contractGroups);
+
+    console.log("Contract Groups:", contractGroups);
+    console.log("Number of invoices to create:", groupKeys.length);
+
+    if (groupKeys.length === 1) {
+      // Single invoice for all contracts (same recipient)
+      const contracts = contractGroups[groupKeys[0]];
+      const firstContract = contracts[0];
+
+      // Determine recipient info
+      const brokeragePayableBy =
+        firstContract.brokeragePayableBy?.toLowerCase() || "buyer";
+      const recipientType = brokeragePayableBy.includes("seller")
+        ? "seller"
+        : "buyer";
+      const recipientName =
+        recipientType === "seller"
+          ? firstContract.seller?.legalName
+          : firstContract.buyer?.name;
+
+      console.log(
+        `Creating single invoice for ${contracts.length} contracts - ${recipientName}`
+      );
+
+      createInvoiceMutation.mutate({
+        contractIds: contracts.map((c) => c._id!),
+        invoiceDate: invoiceFormData.invoiceDate,
+        dueDate: invoiceFormData.dueDate,
+        reference:
+          invoiceFormData.reference ||
+          (contracts.length === 1
+            ? `${contracts[0].contractNumber} - ${recipientName}`
+            : `Brokerage Invoice - ${recipientName} (${contracts.length} contracts)`),
+        notes: invoiceFormData.notes,
+      });
+    } else {
+      // Multiple invoices for different recipients
+      toast.loading(`Creating ${groupKeys.length} invoices...`);
+
+      try {
+        const promises = groupKeys.map((key) => {
+          const contracts = contractGroups[key];
+          const firstContract = contracts[0];
+
+          // Determine recipient info
+          const brokeragePayableBy =
+            firstContract.brokeragePayableBy?.toLowerCase() || "buyer";
+          const recipientType = brokeragePayableBy.includes("seller")
+            ? "seller"
+            : "buyer";
+          const recipientName =
+            recipientType === "seller"
+              ? firstContract.seller?.legalName
+              : firstContract.buyer?.name;
+
+          const groupReference =
+            contracts.length === 1
+              ? `${contracts[0].contractNumber} - ${recipientName}`
+              : `Brokerage Invoice - ${recipientName} (${contracts.length} contracts)`;
+
+          console.log(
+            `Creating invoice for ${contracts.length} contracts - ${recipientName}`
+          );
+
+          return createXeroInvoice({
+            contractIds: contracts.map((c) => c._id!),
+            invoiceDate: invoiceFormData.invoiceDate,
+            dueDate: invoiceFormData.dueDate,
+            reference: groupReference,
+            notes: invoiceFormData.notes,
+          });
+        });
+
+        const results = await Promise.all(promises);
+        toast.dismiss();
+
+        queryClient.invalidateQueries({ queryKey: ["contracts"] });
+        setIsInvoiceModalOpen(false);
+        setSelectedRows([]);
+        setToggleCleared((prev) => !prev);
+
+        // Count how many were updated vs created
+        const updatedCount = results.filter((r) => r.data?.isUpdate).length;
+        const createdCount = results.length - updatedCount;
+
+        let successMessage = "";
+        if (updatedCount > 0 && createdCount > 0) {
+          successMessage = `Successfully created ${createdCount} and updated ${updatedCount} invoices!`;
+        } else if (updatedCount > 0) {
+          successMessage = `Successfully updated ${updatedCount} invoice${
+            updatedCount > 1 ? "s" : ""
+          }!`;
+        } else {
+          successMessage = `Successfully created ${createdCount} invoice${
+            createdCount > 1 ? "s" : ""
+          }!`;
+        }
+
+        toast.success(successMessage, {
+          duration: 5000,
+        });
+      } catch (error: any) {
+        toast.dismiss();
+
+        // Handle token expiration in batch invoice creation
+        const errorData = error.response?.data || error;
+        if (errorData.requiresReconnection) {
+          toast.error(
+            <div>
+              <p className="font-semibold">Xero Session Expired</p>
+              <p className="text-sm mt-1">
+                Please close this dialog and try again to reconnect.
+              </p>
+            </div>,
+            { duration: 5000 }
+          );
+
+          setXeroStatus({
+            isConnected: false,
+            tenantName: null,
+            isChecking: false,
+          });
+        } else {
+          toast.error(error.message || "Failed to create invoices");
+        }
+      }
+    }
   };
 
   // Track if search filters are active
-  const [hasSearchFilters, setHasSearchFilters] = useState(false);
+  const [hasSearchFilters, setHasSearchFilters] = useState(
+    Object.keys(paginationState.searchFilters).length > 0 &&
+      Object.values(paginationState.searchFilters).some((v) => v.trim() !== "")
+  );
 
   // Handle search filter changes from AdvanceSearchFilter component
   const handleAdvanceFilterChange = useCallback(
@@ -306,12 +842,10 @@ const ContractManagementPage = () => {
       setPaginationState((prev) => ({
         ...prev,
         searchFilters: filters,
-        page: 1, // Reset to first page when filters change
+        page: 1,
       }));
 
       setHasSearchFilters(hasFilters);
-
-      // Clear selections when filters change
       setSelectedRows([]);
       setToggleCleared((prev) => !prev);
     },
@@ -330,10 +864,8 @@ const ContractManagementPage = () => {
       limit: paginationState.limit,
     };
 
-    // Add search filters with proper mapping
     Object.entries(paginationState.searchFilters).forEach(([key, value]) => {
       if (value && value.trim() !== "") {
-        // Map the filter keys to API parameter names that match backend
         switch (key) {
           case "ngr":
             params.ngrNumber = value.trim();
@@ -362,7 +894,7 @@ const ContractManagementPage = () => {
       }
     });
 
-    if (paginationState.status !== "all") {
+    if (paginationState.status !== "all" && paginationState.status) {
       params.status = paginationState.status;
     }
 
@@ -386,19 +918,21 @@ const ContractManagementPage = () => {
     queryFn: () => {
       return fetchContracts(buildQueryParams());
     },
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
     enabled: isMounted,
   });
 
-  // Extract data from response
   const contracts = contractsResponse?.data || [];
   const totalPages = contractsResponse?.totalPages || 0;
   const totalRecords = contractsResponse?.total || 0;
   const currentPage = contractsResponse?.page || 1;
+
   // Update filter active state
   useEffect(() => {
-    setIsFilterActive(hasSearchFilters);
+    const statusActive =
+      paginationState.status !== "" && paginationState.status !== "all";
+    setIsFilterActive(hasSearchFilters || statusActive);
   }, [paginationState.status, hasSearchFilters]);
 
   // Delete mutation
@@ -420,14 +954,12 @@ const ContractManagementPage = () => {
     },
   });
 
-  // Handle row click to view details
   const handleRowClicked = (row: TContract) => {
     if (row?._id) {
       router.push(`/dashboard/contract-management/${row._id}`);
     }
   };
 
-  // Handle row selection
   const handleChange = (selected: {
     allSelected: boolean;
     selectedCount: number;
@@ -439,62 +971,60 @@ const ContractManagementPage = () => {
     setSelectedRows(validSelectedRows);
   };
 
-  // Handle pagination change
   const handlePageChange = (page: number) => {
     setPaginationState((prev) => ({ ...prev, page }));
-    setSelectedRows([]); // Clear selections on page change
+    setSelectedRows([]);
     setToggleCleared((prev) => !prev);
   };
 
-  // Handle rows per page change
   const handlePerRowsChange = (newPerPage: number) => {
     setPaginationState((prev) => ({
       ...prev,
       limit: newPerPage,
-      page: 1, // Reset to first page
+      page: 1,
     }));
     setSelectedRows([]);
     setToggleCleared((prev) => !prev);
   };
 
-  // Handle sorting
   const handleSort = (column: any, sortDirection: "asc" | "desc") => {
     setPaginationState((prev) => ({
       ...prev,
       sortBy: column.sortField || column.selector,
       sortOrder: sortDirection,
-      page: 1, // Reset to first page when sorting
+      page: 1,
     }));
   };
 
-  // Handle status filter change
   const handleStatusChange = useCallback((value: string) => {
     setPaginationState((prev) => ({
       ...prev,
       status: value,
-      page: 1, // Reset to first page
+      page: 1,
     }));
-    setHasSearchFilters(true);
     setIsFilterOpen(false);
     setSelectedRows([]);
     setToggleCleared((prev) => !prev);
   }, []);
 
-  // Clear all filters
+  // Updated clear filters function to also clear localStorage
   const clearFilters = useCallback(() => {
-    setPaginationState((prev) => ({
-      ...prev,
-      status: "all",
-      searchFilters: {},
+    setPaginationState({
       page: 1,
-    }));
+      limit: 10,
+      searchFilters: {},
+      status: "",
+      sortBy: "",
+      sortOrder: "asc",
+    });
     setHasSearchFilters(false);
     setIsFilterOpen(false);
     setSelectedRows([]);
     setToggleCleared((prev) => !prev);
+    clearFiltersFromStorage();
+    toast.success("All filters cleared");
   }, []);
 
-  // Handle delete selected contracts
   const handleDelete = () => {
     if (selectedRows.length === 0) {
       toast.error("Please select at least one contract to delete");
@@ -503,7 +1033,6 @@ const ContractManagementPage = () => {
     setIsDeleteConfirmOpen(true);
   };
 
-  // Confirm delete
   const confirmDelete = () => {
     const selectedIds = selectedRows
       .filter((row): row is TContract => row != null && row._id != null)
@@ -518,7 +1047,6 @@ const ContractManagementPage = () => {
     deleteMutation.mutate(selectedIds);
   };
 
-  // Handle edit selected contract
   const handleEdit = () => {
     if (selectedRows.length !== 1) {
       toast.error("Please select exactly one contract to edit");
@@ -574,18 +1102,15 @@ const ContractManagementPage = () => {
         return;
       }
 
-      // Generate PDF blob using your existing ExportContractPdf component
       const pdfBlob = await generatePDFBlobFromComponent(validRows);
 
       if (!pdfBlob) {
         throw new Error("Failed to generate PDF");
       }
 
-      // Upload to Cloudinary
       const filename = `contracts_${recipientType}_${Date.now()}.pdf`;
       const cloudinaryResponse = await uploadPDFToCloudinary(pdfBlob, filename);
 
-      // Create subject
       let subject;
       const contract = validRows[0];
       if (recipientType === "seller" && validRows.length === 1) {
@@ -600,7 +1125,6 @@ const ContractManagementPage = () => {
         } Documents`;
       }
 
-      // Enhanced email body with PDF link
       const contractSummary = validRows
         .map(
           (contract) =>
@@ -623,7 +1147,6 @@ If you have any questions, please don't hesitate to contact us.
 Best regards,
 Growth Grain Services`;
 
-      // Create Outlook mailto link with properly encoded body
       const outlookLink = `mailto:${recipients.join(
         ","
       )}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(
@@ -631,8 +1154,6 @@ Growth Grain Services`;
       )}`;
 
       toast.dismiss();
-
-      // Open default email client (Outlook if it's the default)
       window.location.href = outlookLink;
 
       toast.success(
@@ -645,7 +1166,6 @@ Growth Grain Services`;
     }
   };
 
-  // Function to generate PDF blob using your existing ExportContractPdf component
   const generatePDFBlobFromComponent = async (
     contracts: TContract[]
   ): Promise<Blob | null> => {
@@ -666,7 +1186,6 @@ Growth Grain Services`;
     }
   };
 
-  // Updated utility function for Cloudinary upload (fixed for PDF files)
   const uploadPDFToCloudinary = async (
     pdfBlob: Blob,
     filename: string
@@ -755,7 +1274,10 @@ Growth Grain Services`;
 
         {/* Advanced Search Filter */}
         <div className="w-full xl:w-[30rem] md:w-64 lg:w-80 relative">
-          <AdvanceSearchFilter onFilterChange={handleAdvanceFilterChange} />
+          <AdvanceSearchFilter
+            onFilterChange={handleAdvanceFilterChange}
+            initialFilters={paginationState.searchFilters}
+          />
         </div>
       </div>
 
@@ -788,27 +1310,44 @@ Growth Grain Services`;
                   {Object.keys(paginationState.searchFilters).join(", ")}
                 </span>
               )}
+              {paginationState.status && paginationState.status !== "all" && (
+                <span className="ml-2 text-blue-600">
+                  • Status: {paginationState.status}
+                </span>
+              )}
             </p>
           </div>
 
           {/* Action Buttons */}
           <div className="w-full md:w-auto lg:flex lg:flex-row gap-2 grid grid-cols-3">
-            {/* <button
+            <button
               onClick={handleCreateInvoice}
               disabled={
-                selectedRows.length !== 1 ||
-                selectedRows[0]?.status?.toLowerCase() === "draft"
+                selectedRows.length === 0 ||
+                selectedRows[0]?.status?.toLowerCase() === "draft" ||
+                xeroStatus.isChecking
               }
-              className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${
-                selectedRows.length === 1 &&
-                selectedRows[0]?.status?.toLowerCase() !== "draft"
-                  ? "cursor-pointer"
-                  : "cursor-not-allowed opacity-50 pointer-events-none"
+              className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${
+                selectedRows.length > 0 &&
+                selectedRows[0]?.status?.toLowerCase() !== "draft" &&
+                !xeroStatus.isChecking
+                  ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
+                  : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
               }`}
             >
-              <IoReceiptOutline />
-              Create Invoice
-            </button> */}
+              {xeroStatus.isChecking ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <IoReceiptOutline />
+                  Create Invoice
+                </>
+              )}
+            </button>
+
             <button
               onClick={handleDuplicate}
               className={`w-full md:w-auto px-3 py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${
@@ -897,30 +1436,6 @@ Growth Grain Services`;
                   </div>
 
                   <div className="max-h-60 overflow-y-auto">
-                    {/* <div
-                      className={`px-4 py-2 text-sm cursor-pointer flex items-center ${
-                        paginationState.status === "all"
-                          ? "bg-blue-50 text-blue-600"
-                          : "hover:bg-gray-50"
-                      }`}
-                      onClick={() => handleStatusChange("all")}
-                    >
-                      <span className="flex-grow">All</span>
-                      {paginationState.status === "all" && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-4 w-4 text-blue-500"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      )}
-                    </div> */}
                     {statusOptions.map((option) => (
                       <div
                         key={option.value}
@@ -1001,7 +1516,6 @@ Growth Grain Services`;
                 <span className="ml-3 text-gray-600">Loading...</span>
               </div>
             }
-            // Server-side pagination
             pagination
             paginationServer
             paginationTotalRows={totalRecords}
@@ -1017,15 +1531,13 @@ Growth Grain Services`;
               selectAllRowsItem: false,
               selectAllRowsItemText: "All",
             }}
-            // Server-side sorting
             sortServer
             onSort={handleSort}
-            // No data component
             noDataComponent={
               <div className="p-10 text-center text-gray-500">
                 {totalRecords === 0 &&
                 !hasSearchFilters &&
-                paginationState.status === "all"
+                (!paginationState.status || paginationState.status === "all")
                   ? "No contracts found. Create your first contract to get started."
                   : "No contracts found matching your current filters."}
                 {isFilterActive && (
@@ -1050,9 +1562,7 @@ Growth Grain Services`;
               Showing {(currentPage - 1) * paginationState.limit + 1} to{" "}
               {Math.min(currentPage * paginationState.limit, totalRecords)} of{" "}
               {totalRecords} entries
-              {isFilterActive && (
-                <span> (filtered from {totalRecords} total entries)</span>
-              )}
+              {isFilterActive && <span> (filtered from total entries)</span>}
             </div>
             <div className="mt-2 sm:mt-0">
               {selectedRows.length > 0 && (
@@ -1112,14 +1622,22 @@ Growth Grain Services`;
       )}
 
       {/* Xero Invoice Creation Modal */}
-      {isInvoiceModalOpen && selectedRows.length === 1 && (
+      {isInvoiceModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-opacity-50">
           <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
-              <h3 className="text-xl font-semibold flex gap-x-3 items-center">
-                <IoReceiptOutline className="text-blue-600 text-2xl" />
-                Create Xero Invoice
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold flex gap-x-3 items-center">
+                  <IoReceiptOutline className="text-blue-600 text-2xl" />
+                  Create Xero Invoice
+                </h3>
+
+                {/* Xero Status Indicator */}
+                <div className="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full">
+                  <MdCheckCircle className="text-green-600" />
+                  <span className="text-sm text-green-700">Connected</span>
+                </div>
+              </div>
             </div>
 
             <div className="px-6 py-4">
@@ -1251,17 +1769,17 @@ Growth Grain Services`;
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-              </div>
 
-              {/* Warning Message */}
-              <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm text-yellow-800 flex items-start gap-2">
-                  <IoWarning className="text-lg flex-shrink-0 mt-0.5" />
-                  <span>
-                    This will create a draft invoice in Xero. You can review and
-                    modify it before sending to the customer.
-                  </span>
-                </p>
+                {/* Info Message */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800 flex items-start gap-2">
+                    <MdCheckCircle className="text-lg flex-shrink-0 mt-0.5" />
+                    <span>
+                      This will create a draft invoice in Xero. You can review
+                      and modify it before sending to the customer.
+                    </span>
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -1284,17 +1802,15 @@ Growth Grain Services`;
               </button>
               <button
                 onClick={confirmCreateInvoice}
-                //todo: have to functional after complete
-                // disabled={
-                //   createInvoiceMutation.isPending || !invoiceFormData.dueDate
-                // }
-                disabled
+                disabled={
+                  createInvoiceMutation.isPending || !invoiceFormData.dueDate
+                }
                 className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
               >
                 {createInvoiceMutation.isPending ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Creating...
+                    Creating Invoice...
                   </>
                 ) : (
                   <>

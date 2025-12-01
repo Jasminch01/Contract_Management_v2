@@ -49,12 +49,10 @@ const EditableContract: React.FC<ContractProps> = ({
   const [showContactDropdown, setShowContactDropdown] = useState(false);
   const [showSellerContactDropdown, setShowSellerContactDropdown] =
     useState(false);
-  const [selectedBuyerContactName, setSelectedBuyerContactName] = useState(
-    initialContract.buyerContactName || ""
-  );
-  const [selectedSellerContactName, setSelectedSellerContactName] = useState(
-    initialContract.sellerContactName || ""
-  );
+  const [selectedBuyerContact, setSelectedBuyerContact] =
+    useState<ContactDetails | null>(null);
+  const [selectedSellerContact, setSelectedSellerContact] =
+    useState<ContactDetails | null>(null);
   const [isLoadingContractNumber, setIsLoadingContractNumber] = useState(false);
   const [uploadingBuyerContract, setUploadingBuyerContract] = useState(false);
   const [uploadingSellerContract, setUploadingSellerContract] = useState(false);
@@ -68,12 +66,7 @@ const EditableContract: React.FC<ContractProps> = ({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [startDate, endDate] = dateRange;
-  const statusOptions: ContractStatus[] = [
-    "Incomplete",
-    "Complete",
-    "Invoiced",
-    "Draft",
-  ];
+  const statusOptions: ContractStatus[] = ["Incomplete", "Complete", "Draft"];
 
   // Cloudinary upload function
   const uploadToCloudinary = async (file: File): Promise<string> => {
@@ -138,28 +131,40 @@ const EditableContract: React.FC<ContractProps> = ({
         : contract.seller?._id)
   );
 
-  const handleBuyerSelect = (selectedBuyer: Buyer) => {
+  // Handle buyer selection from BuyerSelect component
+  const handleBuyerSelect = (buyer: Buyer) => {
     setContract((prev) => ({
       ...prev,
-      buyer: selectedBuyer._id,
+      buyer: buyer._id,
     }));
     setHasChanges(true);
 
-    // Auto-select first contact name if available
-    if (selectedBuyer.contactName && selectedBuyer.contactName.length > 0) {
-      const firstContactName = selectedBuyer.contactName[0];
-      setSelectedBuyerContactName(firstContactName);
+    // Auto-select first contact if available
+    if (buyer.contacts && buyer.contacts.length > 0) {
+      const firstContact = buyer.contacts[0];
+      setSelectedBuyerContact(firstContact);
       setContract((prev) => ({
         ...prev,
-        buyerContactName: firstContactName,
+        buyerContact: firstContact,
       }));
     } else {
-      setSelectedBuyerContactName("");
+      // No contacts available, clear contact field
+      setSelectedBuyerContact(null);
       setContract((prev) => ({
         ...prev,
-        buyerContactName: "",
+        buyerContact: undefined,
       }));
     }
+  };
+
+  const handleContactSelect = (contact: ContactDetails) => {
+    setSelectedBuyerContact(contact);
+    setContract((prev) => ({
+      ...prev,
+      buyerContact: contact,
+    }));
+    setShowContactDropdown(false);
+    setHasChanges(true);
   };
 
   // Handle seller selection from SellerSelect component
@@ -171,37 +176,31 @@ const EditableContract: React.FC<ContractProps> = ({
     }));
     setHasChanges(true);
 
-    // Auto-select first contact name if available - ADD THIS SECTION:
+    // ✅ Auto-select first contact (if available)
     if (selectedSeller.contactName && selectedSeller.contactName.length > 0) {
-      const firstContactName = selectedSeller.contactName[0];
-      setSelectedSellerContactName(firstContactName);
+      const firstContact = selectedSeller.contactName[0];
+      setSelectedSellerContact(firstContact);
       setContract((prev) => ({
         ...prev,
-        sellerContactName: firstContactName,
+        sellerContact: firstContact,
       }));
     } else {
-      setSelectedSellerContactName("");
+      // No contacts available, clear contact field
+      setSelectedSellerContact(null);
       setContract((prev) => ({
         ...prev,
-        sellerContactName: "",
+        sellerContact: undefined,
       }));
     }
   };
 
-  const handleContactSelect = (contactName) => {
-    if (contactName !== contract.buyerContactName) {
-      setSelectedBuyerContactName(contactName);
-      setHasChanges(true);
-    }
-    setShowContactDropdown(false);
-  };
-
-  const handleSellerContact = (contactName) => {
-    if (contactName !== contract.sellerContactName) {
-      setSelectedSellerContactName(contactName);
+  const handleSellerContact = (contact: ContactDetails) => {
+    // ✅ Only update if contact is different
+    if (contact.name !== contract.sellerContact?.name) {
+      setSelectedSellerContact(contact);
       setContract((prev) => ({
         ...prev,
-        sellerContactName: contactName, // Add this line
+        sellerContact: contact,
       }));
       setHasChanges(true);
     }
@@ -245,22 +244,13 @@ const EditableContract: React.FC<ContractProps> = ({
 
   const getFormattedSeasons = () => {
     if (typeof window === "undefined") {
-      // Return empty array during SSR to avoid hydration mismatch
       return [];
     }
-
-    // This gets the current year every time the function is called
-    // So it automatically updates when the year changes
     const currentYear = new Date().getFullYear();
-
-    // Generate seasons: 1 future season + current season + previous seasons back to 2021/2022
-    // But filter out any seasons below 2021/2022
     const seasons = [];
 
-    // Start from next year (future season) and go backwards
     for (let i = 0; i < 20; i++) {
-      // 20 is a safe upper limit to ensure we capture all needed seasons
-      const startYear = currentYear + 1 - i; // +1 for future season, then go backwards
+      const startYear = currentYear + 1 - i;
       const endYear = startYear + 1;
 
       // Stop if we go below 2021/2022 season
@@ -372,45 +362,6 @@ const EditableContract: React.FC<ContractProps> = ({
       }));
     }
   };
-
-  // const handleDateChange = (update: [Date | null, Date | null]) => {
-  //   try {
-  //     const [start, end] = update;
-  //     setDateRange(update);
-
-  //     // Only update contract when both dates are selected and valid
-  //     if (start && end && start instanceof Date && end instanceof Date) {
-  //       // Validate dates are not invalid
-  //       if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-  //         // Use ISO string for consistent date formatting
-  //         const startStr = start.toLocaleDateString().split("T")[0]; // YYYY-MM-DD format
-  //         const endStr = end.toLocaleDateString().split("T")[0];
-
-  //         setContract((prev) => ({
-  //           ...prev,
-  //           deliveryPeriod: { start: startStr, end: endStr },
-  //         }));
-  //         setHasChanges(true);
-  //       }
-  //     } else if (!start && !end) {
-  //       // Clear dates when picker is cleared
-  //       setContract((prev) => ({
-  //         ...prev,
-  //         deliveryPeriod: { start: "", end: "" },
-  //       }));
-  //       setHasChanges(true);
-  //     }
-  //   } catch (error) {
-  //     console.error("Date handling error:", error);
-  //     // Reset to safe state on error
-  //     setDateRange([null, null]);
-  //     setContract((prev) => ({
-  //       ...prev,
-  //       deliveryPeriod: { start: "", end: "" },
-  //     }));
-  //   }
-  // };
-
   const formatDateDisplay = (dateString: string | undefined) => {
     if (!dateString) return "N/A";
 
@@ -559,9 +510,8 @@ const EditableContract: React.FC<ContractProps> = ({
           ? contract.attachedSellerContract
           : "",
 
-      buyerContactName: selectedBuyerContactName || contract.buyerContactName,
-      sellerContactName:
-        selectedSellerContactName || contract.sellerContactName,
+      buyerContactName: selectedBuyerContact,
+      sellerContactName: selectedSellerContact,
     };
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { _id, createdAt, _v, updatedAt, ...contractWithoutId } =
@@ -790,7 +740,7 @@ const EditableContract: React.FC<ContractProps> = ({
                   <p className="text-sm">
                     End : {formatDateDisplay(contract?.deliveryPeriod?.end)}
                   </p>
-                </div>  
+                </div>
               </div>
               <div className="w-1/2 p-3">
                 <DatePicker
@@ -1061,16 +1011,27 @@ const EditableContract: React.FC<ContractProps> = ({
               </div>
               <div className="w-1/2 p-3 relative">
                 <div
-                  className="w-full p-2 rounded bg-gray-50 border border-gray-300 cursor-pointer flex items-center justify-between hover:bg-gray-100"
-                  onClick={() => setShowContactDropdown(!showContactDropdown)}
+                  className={`w-full p-2 rounded bg-gray-50 border border-gray-300 flex items-center justify-between ${
+                    selectedBuyer?.contacts && selectedBuyer.contacts.length > 0
+                      ? "cursor-pointer hover:bg-gray-100"
+                      : "cursor-not-allowed opacity-60"
+                  }`}
+                  onClick={() => {
+                    if (
+                      selectedBuyer?.contacts &&
+                      selectedBuyer.contacts.length > 0
+                    ) {
+                      setShowContactDropdown(!showContactDropdown);
+                    }
+                  }}
                 >
                   <span className="text-gray-700">
-                    {selectedBuyerContactName ||
-                      contract.buyerContactName ||
+                    {selectedBuyerContact?.name ||
+                      contract.buyerContact?.name ||
                       "No contact selected"}
                   </span>
-                  {selectedBuyer?.contactName &&
-                    selectedBuyer.contactName.length > 0 && (
+                  {selectedBuyer?.contacts &&
+                    selectedBuyer.contacts.length > 0 && (
                       <svg
                         className={`w-4 h-4 text-gray-500 transition-transform ${
                           showContactDropdown ? "rotate-180" : ""
@@ -1089,38 +1050,41 @@ const EditableContract: React.FC<ContractProps> = ({
                     )}
                 </div>
 
-                {showContactDropdown && selectedBuyer?.contactName && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto">
-                    {selectedBuyer.contactName.map((contactName, index) => {
-                      // Check if this contact name is the currently selected/existing one
-                      const isSelected =
-                        contactName ===
-                        (selectedBuyerContactName || contract.buyerContactName);
+                {showContactDropdown &&
+                  selectedBuyer?.contacts &&
+                  selectedBuyer.contacts.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto">
+                      {selectedBuyer.contacts.map((contact, index) => {
+                        // Check if this contact is the currently selected one
+                        const isSelected =
+                          contact.name ===
+                          (selectedBuyerContact?.name ||
+                            contract.buyerContact?.name);
 
-                      return (
-                        <div
-                          key={index}
-                          className={`p-2 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-                            isSelected
-                              ? "bg-blue-100 text-blue-800 font-medium hover:bg-blue-200"
-                              : "hover:bg-gray-100"
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleContactSelect(contactName);
-                          }}
-                        >
-                          {contactName}
-                          {isSelected && (
-                            <span className="ml-2 text-xs text-blue-600">
-                              (Selected)
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        return (
+                          <div
+                            key={index}
+                            className={`p-2 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                              isSelected
+                                ? "bg-blue-100 text-blue-800 font-medium hover:bg-blue-200"
+                                : "hover:bg-gray-100"
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleContactSelect(contact);
+                            }}
+                          >
+                            {contact.name}
+                            {isSelected && (
+                              <span className="ml-2 text-xs text-blue-600">
+                                (Selected)
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                 {/* Click outside to close dropdown */}
                 {showContactDropdown && (
@@ -1132,10 +1096,10 @@ const EditableContract: React.FC<ContractProps> = ({
 
                 {/* Show info if no contact names available */}
                 {selectedBuyer &&
-                  (!selectedBuyer.contactName ||
-                    selectedBuyer.contactName.length === 0) && (
+                  (!selectedBuyer.contacts ||
+                    selectedBuyer.contacts.length === 0) && (
                     <div className="mt-1 text-xs text-gray-500">
-                      No contact names available for this buyer
+                      No contacts available for this buyer
                     </div>
                   )}
               </div>
@@ -1144,7 +1108,11 @@ const EditableContract: React.FC<ContractProps> = ({
               <div className="w-1/2 p-3 text-[#1A1A1A] font-medium">Email</div>
               <div className="w-1/2 p-3">
                 <div className="w-full p-1 rounded bg-gray-50">
-                  {selectedBuyer?.email || ""}
+                  {/* Priority: selected contact email > contract contact email > buyer main email */}
+                  {selectedBuyerContact?.email ||
+                    contract.buyerContact?.email ||
+                    selectedBuyer?.email ||
+                    ""}
                 </div>
               </div>
             </div>
@@ -1152,7 +1120,11 @@ const EditableContract: React.FC<ContractProps> = ({
               <div className="w-1/2 p-3 text-[#1A1A1A] font-medium">Phone</div>
               <div className="w-1/2 p-3">
                 <div className="w-full p-1 rounded bg-gray-50">
-                  {selectedBuyer?.phoneNumber || ""}
+                  {/* Priority: selected contact phone > contract contact phone > buyer main phone */}
+                  {selectedBuyerContact?.phoneNumber ||
+                    contract.buyerContact?.phoneNumber ||
+                    selectedBuyer?.phoneNumber ||
+                    ""}
                 </div>
               </div>
             </div>
@@ -1253,43 +1225,42 @@ const EditableContract: React.FC<ContractProps> = ({
                   }
                 >
                   <span className="text-gray-700">
-                    {selectedSellerContactName ||
-                      contract.sellerContactName ||
+                    {selectedSellerContact?.name||
+                      contract.sellerContact?.name ||
                       "No contact selected"}
                   </span>
                 </div>
 
-                {showSellerContactDropdown && selectedSeller?.contactName && (
-                  <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto">
-                    {selectedSeller.contactName.map((contactName, index) => {
-                      // Check if this contact name is the currently selected/existing one
-                      const isSelected =
-                        contactName === contract.sellerContactName;
-
-                      return (
-                        <div
-                          key={index}
-                          className={`p-2 cursor-pointer border-b border-gray-100 last:border-b-0 ${
-                            isSelected
-                              ? "bg-blue-100 text-blue-800 font-medium hover:bg-blue-200"
-                              : "hover:bg-gray-100"
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSellerContact(contactName);
-                          }}
-                        >
-                          {contactName}
-                          {isSelected && (
-                            <span className="ml-2 text-xs text-blue-600">
-                              (Selected)
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                {showSellerContactDropdown &&
+                  selectedSeller?.contactName?.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto">
+                      {selectedSeller.contactName.map((contact, index) => {
+                        const isSelected =
+                          contact.name === contract.sellerContact?.name;
+                        return (
+                          <div
+                            key={index}
+                            className={`p-2 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                              isSelected
+                                ? "bg-blue-100 text-blue-800 font-medium hover:bg-blue-200"
+                                : "hover:bg-gray-100"
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSellerContact(contact);
+                            }}
+                          >
+                            {contact.name}
+                            {isSelected && (
+                              <span className="ml-2 text-xs text-blue-600">
+                                (Selected)
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                 {/* Click outside to close dropdown */}
                 {showSellerContactDropdown && (
@@ -1304,7 +1275,9 @@ const EditableContract: React.FC<ContractProps> = ({
               <div className="w-1/2 p-3 text-[#1A1A1A] font-medium">Email</div>
               <div className="w-1/2 p-3">
                 <div className="w-full p-1 rounded bg-gray-50">
-                  {selectedSeller?.email || ""}
+                  {contract?.sellerContact?.email ||
+                    selectedSeller?.email ||
+                    ""}
                 </div>
               </div>
             </div>
@@ -1312,7 +1285,9 @@ const EditableContract: React.FC<ContractProps> = ({
               <div className="w-1/2 p-3 text-[#1A1A1A] font-medium">Phone</div>
               <div className="w-1/2 p-3">
                 <div className="w-full p-1 rounded bg-gray-50">
-                  {selectedSeller?.phoneNumber || ""}
+                  {contract.sellerContact?.phoneNumber ||
+                    selectedSeller?.phoneNumber ||
+                    ""}
                 </div>
               </div>
             </div>

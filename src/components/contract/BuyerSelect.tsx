@@ -278,7 +278,15 @@ const BuyerSelect = ({ onSelect }: BuyerSelectProps) => {
                       onClick={() => handleSelectBuyer(buyer)}
                     >
                       <div className="flex items-center justify-between">
-                        <span>{buyer.name}</span>
+                        <div>
+                          <span className="block font-medium">{buyer.name}</span>
+                          {/* Show contact count if available */}
+                          {buyer.contacts && buyer.contacts.length > 0 && (
+                            <span className="text-xs text-gray-500">
+                              {buyer.contacts.length} contact{buyer.contacts.length !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
                         {selectedBuyer?._id === buyer._id && (
                           <svg
                             className="h-4 w-4 text-blue-600"

@@ -17,10 +17,10 @@ const menus = [
     page: "Contract Management",
     link: "/dashboard/contract-management",
   },
-  // {
-  //   page: "Invoicing",
-  //   link: "/dashboard/invoicing",
-  // },
+  {
+    page: "Invoicing",
+    link: "/dashboard/invoicing",
+  },
   {
     page: "Buyer Management",
     link: "/dashboard/buyer-management",

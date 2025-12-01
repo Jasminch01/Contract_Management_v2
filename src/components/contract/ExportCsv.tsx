@@ -16,7 +16,7 @@ const ExportCsv: React.FC<ExportCSVButtonProps> = ({ selectedRows }) => {
     grower: row?.seller?.legalName || "",
     tonnes: row.tonnes,
     buyer: row.buyer?.name || "",
-    destination: row.buyer?.officeAddress || "",
+    destination: row.deliveryDestination || "",
     priceExGst: `A$${row?.priceExGST}`,
     status: row.status,
     notes: row.notes || "",

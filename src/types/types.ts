@@ -65,18 +65,25 @@ export interface PortZoneBid {
   updatedAt?: Date;
 }
 
+export interface ContactDetails {
+  name: string;
+  email: string;
+  phoneNumber: string;
+}
+
 export interface Buyer {
   _id?: string;
   name: string;
   abn: string;
   officeAddress: string;
   accountNumber: string;
-  contactName: string[]; // Now an array instead of string
-  email: string;
-  phoneNumber: string;
+  contacts: ContactDetails[]; // New field for contact details
+  email: string; // Main buyer email
+  phoneNumber: string; // Main buyer phone
   isDeleted?: boolean;
   deletedAt?: string;
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export type ContractStatus = "Draft" | "Incomplete" | "Complete" | "Invoiced";
@@ -107,7 +114,7 @@ export interface Seller {
   authorityToAct?: string;
   address?: string;
   mainNgr?: string;
-  contactName: string[];
+  contactName: ContactDetails[];
   locationZone?: string[];
   phoneNumber?: string;
   authorityActFormPdf?: string;
@@ -147,8 +154,8 @@ export interface TContract {
   termsAndConditions: string;
   notes: string;
   ngrNumber?: string;
-  buyerContactName?: string;
-  sellerContactName?: string;
+  buyerContact?: ContactDetails;
+  sellerContact?: ContactDetails;
   tonnes: string;
   tolerance: string;
   season: string;
@@ -157,6 +164,8 @@ export interface TContract {
   status: string;
   createdAt: string; // or Date if you'll parse it
   contractNumber: string;
+  xeroInvoiceId: string;
+  xeroInvoiceNumber: string;
   contractDate: string; // Added contractDate
 }
 export interface TUpdateContract {
@@ -190,12 +199,12 @@ export interface TUpdateContract {
   notes: string;
   tonnes: string;
   ngrNumber?: string;
-  buyerContactName?: string;
-  sellerContactName?: string;
+  buyerContact?: ContactDetails;
+  sellerContact?: ContactDetails;
   tolerance: string;
   season: string;
   status?: string;
-  contractDate: string; // Added contractDate
+  contractDate: string;
 }
 
 export interface FetchContractsParams {
@@ -275,4 +284,81 @@ export interface SellersPaginatedResponse {
   totalPages: number;
   total: number;
   data: Seller[];
+}
+
+// Add these types to your types/types.ts file
+
+export interface XeroConnectionStatus {
+  connected: boolean;
+  tenantName: string ;
+  connectedAt: string;
+}
+
+export interface CreateInvoiceRequest {
+  contractIds: string[];
+  invoiceDate: string;
+  dueDate: string;
+  reference: string;
+  notes: string;
+}
+
+export interface XeroInvoiceLineItem {
+  description: string;
+  quantity: number;
+  unitAmount: number;
+  accountCode?: string;
+  taxType?: string;
+  lineAmount?: number;
+}
+
+export interface XeroContact {
+  contactID?: string;
+  name: string;
+  emailAddress?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+export interface XeroInvoice {
+  invoiceID?: string;
+  invoiceNumber?: string;
+  type: "ACCREC" | "ACCPAY";
+  contact: XeroContact;
+  date: string;
+  dueDate: string;
+  lineItems: XeroInvoiceLineItem[];
+  reference?: string;
+  status?: "DRAFT" | "SUBMITTED" | "AUTHORISED" | "PAID";
+  lineAmountTypes?: "Exclusive" | "Inclusive" | "NoTax";
+  subTotal?: number;
+  totalTax?: number;
+  total?: number;
+  currencyCode?: string;
+}
+
+export interface CreateInvoiceResponse {
+  isUpdate: boolean;
+  success: boolean;
+  message: string;
+  data?: {
+    invoiceId: string;
+    invoiceNumber: string;
+    xeroUrl: string;
+    invoice: XeroInvoice;
+    isUpdate : boolean;
+  };
+}
+
+export interface XeroErrorResponse {
+  success: false;
+  message: string;
+  error?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  details?: any;
+}
+
+export interface XeroAuthorizationState {
+  isAuthorizing: boolean;
+  isConnected: boolean;
+  error?: string;
 }
