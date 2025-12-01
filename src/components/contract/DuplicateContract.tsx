@@ -50,9 +50,9 @@ const EditableContract: React.FC<ContractProps> = ({
   const [showSellerContactDropdown, setShowSellerContactDropdown] =
     useState(false);
   const [selectedBuyerContact, setSelectedBuyerContact] =
-    useState<ContactDetails | null>(null);
+    useState<ContactDetails | null>(initialContract.buyerContact || null);
   const [selectedSellerContact, setSelectedSellerContact] =
-    useState<ContactDetails | null>(null);
+    useState<ContactDetails | null>(initialContract.sellerContact || null);
   const [isLoadingContractNumber, setIsLoadingContractNumber] = useState(false);
   const [uploadingBuyerContract, setUploadingBuyerContract] = useState(false);
   const [uploadingSellerContract, setUploadingSellerContract] = useState(false);
