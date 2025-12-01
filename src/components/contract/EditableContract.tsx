@@ -69,10 +69,16 @@ const EditableContract: React.FC<ContractProps> = ({
   const [showContactDropdown, setShowContactDropdown] = useState(false);
   const [showSellerContactDropdown, setShowSellerContactDropdown] =
     useState(false);
+  // const [selectedBuyerContact, setSelectedBuyerContact] =
+  //   useState<ContactDetails | null>(null);
+  // const [selectedSellerContact, setSelectedSellerContact] =
+  //   useState<ContactDetails | null>(null);
+
   const [selectedBuyerContact, setSelectedBuyerContact] =
-    useState<ContactDetails | null>(null);
+    useState<ContactDetails | null>(initialContract.buyerContact || null);
   const [selectedSellerContact, setSelectedSellerContact] =
-    useState<ContactDetails | null>(null);
+    useState<ContactDetails | null>(initialContract.sellerContact || null);
+
   const [uploadingBuyerContract, setUploadingBuyerContract] = useState(false);
   const [uploadingSellerContract, setUploadingSellerContract] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -331,12 +337,12 @@ const EditableContract: React.FC<ContractProps> = ({
   };
 
   const handleSellerContact = (contact: ContactDetails) => {
-      setSelectedSellerContact(contact);
-      setContract((prev) => ({
-        ...prev,
-        sellerContact: contact,
-      }));
-      setHasChanges(true);
+    setSelectedSellerContact(contact);
+    setContract((prev) => ({
+      ...prev,
+      sellerContact: contact,
+    }));
+    setHasChanges(true);
     setShowSellerContactDropdown(false);
   };
 
@@ -497,7 +503,12 @@ const EditableContract: React.FC<ContractProps> = ({
     };
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const {_id,createdAt,updatedAt, _v, contractNumber,
+    const {
+      _id,
+      createdAt,
+      updatedAt,
+      _v,
+      contractNumber,
       ...updatedContract
     } = contractToSave;
     updateContractMutation.mutate(updatedContract);
