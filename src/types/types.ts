@@ -69,6 +69,7 @@ export interface ContactDetails {
   name: string;
   email: string;
   phoneNumber: string;
+  isPrimary? : boolean;
 }
 
 export interface Buyer {

@@ -41,11 +41,12 @@ const CreateSellerPage = () => {
   );
   const [uploadingAthAct, setUploadingAthAct] = useState(false);
 
-  // Updated contact state to handle ContactDetails object
+  // Updated contact state to handle ContactDetails object with isPrimary
   const [currentContact, setCurrentContact] = useState<ContactDetails>({
     name: "",
     email: "",
     phoneNumber: "",
+    isPrimary: false,
   });
 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -55,7 +56,7 @@ const CreateSellerPage = () => {
     abn: "",
     mainNgr: "",
     additionalNgrs: [],
-    contactName: [] as ContactDetails[], // Updated type
+    contactName: [] as ContactDetails[],
     email: "",
     phoneNumber: "",
     locationZone: [],
@@ -171,10 +172,18 @@ const CreateSellerPage = () => {
   };
 
   // Handle contact detail changes
-  const handleContactChange = (field: keyof ContactDetails, value: string) => {
+  const handleContactChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
     setCurrentContact((prev) => ({
       ...prev,
-      [field]: value,
+      [name]: value,
+    }));
+  };
+
+  const handlePrimaryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCurrentContact((prev) => ({
+      ...prev,
+      isPrimary: e.target.checked,
     }));
   };
 
@@ -191,20 +200,38 @@ const CreateSellerPage = () => {
       return;
     }
 
-    // Check if contact with same email already exists
-    const emailExists = formData.contactName.some(
-      (contact) =>
-        contact.email.toLowerCase() === currentContact.email.toLowerCase()
-    );
-
-    if (emailExists) {
-      toast.error("Contact with this email already exists");
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(currentContact.email)) {
+      toast.error("Please enter a valid email address");
       return;
+    }
+
+    // Check if contact with same email already exists
+
+
+    // Add contact to list
+    const newContact = {
+      name: currentContact.name.trim(),
+      email: currentContact.email.trim(),
+      phoneNumber: currentContact.phoneNumber.trim(),
+      isPrimary: currentContact.isPrimary || false,
+    };
+
+    // If this contact is marked as primary, remove primary from others
+    let updatedContacts = formData.contactName;
+    if (newContact.isPrimary) {
+      updatedContacts = formData.contactName.map((c) => ({ ...c, isPrimary: false }));
+    }
+
+    // If this is the first contact, make it primary automatically
+    if (formData.contactName.length === 0) {
+      newContact.isPrimary = true;
     }
 
     setFormData((prev) => ({
       ...prev,
-      contactName: [...prev.contactName, currentContact],
+      contactName: [newContact, ...updatedContacts],
     }));
 
     // Reset current contact
@@ -212,16 +239,41 @@ const CreateSellerPage = () => {
       name: "",
       email: "",
       phoneNumber: "",
+      isPrimary: false,
     });
+
+    toast.success("Contact added successfully");
   };
 
   const removeContactName = (emailToRemove: string) => {
+    const updatedContacts = formData.contactName.filter(
+      (contact) => contact.email !== emailToRemove
+    );
+
+    // If we removed the primary contact and there are still contacts left,
+    // make the first one primary
+    const removedContact = formData.contactName.find(
+      (contact) => contact.email === emailToRemove
+    );
+    if (removedContact?.isPrimary && updatedContacts.length > 0) {
+      updatedContacts[0].isPrimary = true;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      contactName: prev.contactName.filter(
-        (contact) => contact.email !== emailToRemove
-      ),
+      contactName: updatedContacts,
     }));
+  };
+
+  const setPrimaryContact = (contactEmail: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      contactName: prev.contactName.map((c) => ({
+        ...c,
+        isPrimary: c.email === contactEmail,
+      })),
+    }));
+    toast.success("Primary contact updated");
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -645,10 +697,9 @@ const CreateSellerPage = () => {
                 <div className="space-y-2 p-3 border border-gray-200 rounded-md bg-gray-50">
                   <input
                     type="text"
+                    name="name"
                     value={currentContact.name}
-                    onChange={(e) =>
-                      handleContactChange("name", e.target.value)
-                    }
+                    onChange={handleContactChange}
                     onKeyDown={handleKeyPress}
                     placeholder="Contact Name"
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A5D36] focus:border-transparent text-sm"
@@ -656,10 +707,9 @@ const CreateSellerPage = () => {
                   />
                   <input
                     type="email"
+                    name="email"
                     value={currentContact.email}
-                    onChange={(e) =>
-                      handleContactChange("email", e.target.value)
-                    }
+                    onChange={handleContactChange}
                     onKeyDown={handleKeyPress}
                     placeholder="Contact Email"
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A5D36] focus:border-transparent text-sm"
@@ -667,15 +717,32 @@ const CreateSellerPage = () => {
                   />
                   <input
                     type="tel"
+                    name="phoneNumber"
                     value={currentContact.phoneNumber}
-                    onChange={(e) =>
-                      handleContactChange("phoneNumber", e.target.value)
-                    }
+                    onChange={handleContactChange}
                     onKeyDown={handleKeyPress}
                     placeholder="Contact Phone Number"
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#2A5D36] focus:border-transparent text-sm"
                     disabled={createSellerMutation.isPending}
                   />
+                  
+                  {/* Primary Contact Checkbox - only show if there are already contacts */}
+                  {formData.contactName.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="isPrimary"
+                        checked={currentContact.isPrimary}
+                        onChange={handlePrimaryChange}
+                        className="w-4 h-4 text-[#2A5D36] focus:ring-[#2A5D36] border-gray-300 rounded"
+                        disabled={createSellerMutation.isPending}
+                      />
+                      <label htmlFor="isPrimary" className="text-sm font-medium text-gray-700">
+                        Set as Primary Contact
+                      </label>
+                    </div>
+                  )}
+                  
                   <button
                     type="button"
                     onClick={addContactName}
@@ -692,11 +759,20 @@ const CreateSellerPage = () => {
                     {formData.contactName.map((contact, index) => (
                       <div
                         key={index}
-                        className="bg-white border border-gray-200 p-3 rounded-md flex justify-between items-start"
+                        className={`bg-white border rounded-md p-3 flex justify-between items-start ${
+                          contact.isPrimary ? "border-[#2A5D36] border-2" : "border-gray-200"
+                        }`}
                       >
                         <div className="flex-1">
-                          <div className="font-medium text-sm text-gray-900">
-                            {contact.name}
+                          <div className="flex items-center gap-2">
+                            <div className="font-medium text-sm text-gray-900">
+                              {contact.name}
+                            </div>
+                            {contact.isPrimary && (
+                              <span className="bg-[#2A5D36] text-white text-xs px-2 py-1 rounded-full">
+                                Primary
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-gray-600">
                             {contact.email}
@@ -704,6 +780,16 @@ const CreateSellerPage = () => {
                           <div className="text-xs text-gray-600">
                             {contact.phoneNumber}
                           </div>
+                          {!contact.isPrimary && (
+                            <button
+                              type="button"
+                              onClick={() => setPrimaryContact(contact.email)}
+                              className="mt-2 text-xs text-[#2A5D36] hover:underline"
+                              disabled={createSellerMutation.isPending}
+                            >
+                              Set as Primary
+                            </button>
+                          )}
                         </div>
                         <button
                           type="button"

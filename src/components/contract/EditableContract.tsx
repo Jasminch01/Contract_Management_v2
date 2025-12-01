@@ -70,9 +70,9 @@ const EditableContract: React.FC<ContractProps> = ({
   const [showSellerContactDropdown, setShowSellerContactDropdown] =
     useState(false);
   const [selectedBuyerContact, setSelectedBuyerContact] =
-    useState<ContactDetails | null>(null);
+    useState<ContactDetails | null>(initialContract.buyerContact || null);
   const [selectedSellerContact, setSelectedSellerContact] =
-    useState<ContactDetails | null>(null);
+    useState<ContactDetails | null>(initialContract.sellerContact || null);
   const [uploadingBuyerContract, setUploadingBuyerContract] = useState(false);
   const [uploadingSellerContract, setUploadingSellerContract] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -331,15 +331,12 @@ const EditableContract: React.FC<ContractProps> = ({
   };
 
   const handleSellerContact = (contact: ContactDetails) => {
-    // ✅ Only update if contact is different
-    if (contact.name !== contract.sellerContact?.name) {
-      setSelectedSellerContact(contact);
-      setContract((prev) => ({
-        ...prev,
-        sellerContact: contact,
-      }));
-      setHasChanges(true);
-    }
+    setSelectedSellerContact(contact);
+    setContract((prev) => ({
+      ...prev,
+      sellerContact: contact,
+    }));
+    setHasChanges(true);
     setShowSellerContactDropdown(false);
   };
 
@@ -500,7 +497,8 @@ const EditableContract: React.FC<ContractProps> = ({
     };
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { _id, createdAt, updatedAt, _v,contractNumber,...updatedContract
+    const {_id, createdAt, updatedAt,_v,contractNumber,
+      ...updatedContract
     } = contractToSave;
     updateContractMutation.mutate(updatedContract);
   };
@@ -1021,37 +1019,46 @@ const EditableContract: React.FC<ContractProps> = ({
                       </svg>
                     )}
                 </div>
-
                 {showContactDropdown &&
                   selectedBuyer?.contacts &&
                   selectedBuyer.contacts.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto">
                       {selectedBuyer.contacts.map((contact, index) => {
-                        // Check if this contact is the currently selected one
                         const isSelected =
-                          contact.name ===
-                          (selectedBuyerContact?.name ||
-                            contract.buyerContact?.name);
+                          contact.email ===
+                          (selectedBuyerContact?.email ||
+                            contract.buyerContact?.email);
 
                         return (
                           <div
                             key={index}
-                            className={`p-2 cursor-pointer border-b border-gray-100 last:border-b-0 ${
+                            className={`p-2 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors ${
                               isSelected
-                                ? "bg-blue-100 text-blue-800 font-medium hover:bg-blue-200"
-                                : "hover:bg-gray-100"
+                                ? "bg-blue-50 text-blue-900 font-medium"
+                                : "hover:bg-gray-50"
                             }`}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleContactSelect(contact);
                             }}
                           >
-                            {contact.name}
-                            {isSelected && (
-                              <span className="ml-2 text-xs text-blue-600">
-                                (Selected)
-                              </span>
-                            )}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span>{contact.name}</span>
+
+                                {contact.isPrimary && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+                                    Primary
+                                  </span>
+                                )}
+                              </div>
+
+                              {isSelected && (
+                                <span className="text-xs font-medium text-blue-700">
+                                  (Selected)
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -1201,6 +1208,24 @@ const EditableContract: React.FC<ContractProps> = ({
                       contract?.sellerContact?.name ||
                       "No contact selected"}
                   </span>
+                  {selectedSeller?.contactName &&
+                    selectedSeller.contactName.length > 0 && (
+                      <svg
+                        className={`w-4 h-4 text-gray-500 transition-transform ${
+                          showContactDropdown ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    )}
                 </div>
 
                 {showSellerContactDropdown &&
@@ -1208,7 +1233,9 @@ const EditableContract: React.FC<ContractProps> = ({
                     <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto">
                       {selectedSeller.contactName.map((contact, index) => {
                         const isSelected =
-                          contact.name === contract.sellerContact.name;
+                          contact.email ===
+                          (selectedSellerContact?.email ||
+                            contract.sellerContact?.email);
                         return (
                           <div
                             key={index}
@@ -1222,12 +1249,21 @@ const EditableContract: React.FC<ContractProps> = ({
                               handleSellerContact(contact);
                             }}
                           >
-                            {contact.name}
-                            {isSelected && (
-                              <span className="ml-2 text-xs text-blue-600">
-                                (Selected)
-                              </span>
-                            )}
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span>{contact.name}</span>
+                                {contact.isPrimary === true && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                                    Primary
+                                  </span>
+                                )}
+                              </div>
+                              {isSelected && (
+                                <span className="text-xs text-blue-600">
+                                  (Selected)
+                                </span>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -1247,7 +1283,10 @@ const EditableContract: React.FC<ContractProps> = ({
               <div className="w-1/2 p-3 text-[#1A1A1A] font-medium">Email</div>
               <div className="w-1/2 p-3">
                 <div className="w-full p-1 rounded bg-gray-50">
-                  {contract?.sellerContact?.email || selectedSeller?.email || ""}
+                  {selectedSellerContact?.email ||
+                    contract?.sellerContact?.email ||
+                    selectedSeller?.email ||
+                    ""}
                 </div>
               </div>
             </div>

@@ -173,22 +173,15 @@ const ExportContractPdf = ({ contracts }: { contracts: TContract[] }) => {
                     ABN : {contract.buyer?.abn || "N/A"}
                   </Text>
                   <Text style={contractPdfStyles.partyText}>
-                    Email :{" "}
-                    {contract.buyer?.email ||
-                      contract?.buyerContact?.email ||
-                      "N/A"}
+                    Email : {contract?.buyerContact?.email}
                   </Text>
                   <Text style={contractPdfStyles.partyText}>
-                    Contact : {contract?.buyerContact?.name || "N/A"}
+                    Contact : {contract?.buyerContact?.name}
                   </Text>
                   <Text style={contractPdfStyles.partyText}>
                     {contract.conveyance === "Port Zone"
-                      ? `Contract Number : ${
-                          contract?.buyerContractReference || "N/A"
-                        }`
-                      : `Buyer Contract : ${
-                          contract?.buyerContractReference || "N/A"
-                        }`}
+                      ? `Contract Number : ${contract?.contractNumber}`
+                      : `Buyer Contract : ${contract?.contractNumber}`}
                   </Text>
                 </View>
 
@@ -204,14 +197,11 @@ const ExportContractPdf = ({ contracts }: { contracts: TContract[] }) => {
                     NGR : {contract.ngrNumber || "N/A"}
                   </Text>
                   <Text style={contractPdfStyles.partyText}>
-                    Email :{" "}
-                    {contract.seller?.email ||
-                      contract.sellerContact?.email ||
-                      "N/A"}
+                    Email : {contract.sellerContact?.email}
                   </Text>
                   <Text style={contractPdfStyles.partyText}>
-                    Contact : {contract?.sellerContact?.name || "N/A"}
-                    {contract?.seller.phoneNumber}
+                    Contact : {contract?.sellerContact?.name}{" "}
+                    {contract?.sellerContact?.phoneNumber}
                   </Text>
                   <Text style={contractPdfStyles.partyText}>
                     ABN : {contract?.seller?.abn}

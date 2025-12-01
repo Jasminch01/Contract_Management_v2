@@ -466,6 +466,10 @@ const ContractManagementPage = () => {
     },
   });
 
+    const areAllContractsInvoiced = (contracts: TContract[]): boolean => {
+    return contracts.length > 0 && 
+      contracts.every(contract => contract.status?.toLowerCase() === 'invoiced');
+  };
   // Group contracts by invoice recipient (based on brokeragePayableBy)
   const groupContractsByInvoiceRecipient = (contracts: TContract[]) => {
     const groups: { [key: string]: TContract[] } = {};
@@ -1320,33 +1324,33 @@ Growth Grain Services`;
 
           {/* Action Buttons */}
           <div className="w-full md:w-auto lg:flex lg:flex-row gap-2 grid grid-cols-3">
-            <button
-              onClick={handleCreateInvoice}
-              disabled={
-                selectedRows.length === 0 ||
-                selectedRows[0]?.status?.toLowerCase() === "draft" ||
-                xeroStatus.isChecking
-              }
-              className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${
-                selectedRows.length > 0 &&
-                selectedRows[0]?.status?.toLowerCase() !== "draft" &&
-                !xeroStatus.isChecking
-                  ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
-                  : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
-              }`}
-            >
-              {xeroStatus.isChecking ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-                  Checking...
-                </>
-              ) : (
-                <>
-                  <IoReceiptOutline />
-                  Create Invoice
-                </>
-              )}
-            </button>
+      <button
+        onClick={handleCreateInvoice}
+        disabled={
+          selectedRows.length === 0 ||
+          selectedRows[0]?.status?.toLowerCase() === "draft" ||
+          xeroStatus.isChecking
+        }
+        className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${
+          selectedRows.length > 0 &&
+          selectedRows[0]?.status?.toLowerCase() !== "draft" &&
+          !xeroStatus.isChecking
+            ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
+            : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
+        }`}
+      >
+        {xeroStatus.isChecking ? (
+          <>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+            Checking...
+          </>
+        ) : (
+          <>
+            <IoReceiptOutline />
+            {areAllContractsInvoiced(selectedRows) ? 'Update Invoice' : 'Create Invoice'}
+          </>
+        )}
+      </button>
 
             <button
               onClick={handleDuplicate}
@@ -1800,7 +1804,7 @@ Growth Grain Services`;
               >
                 Cancel
               </button>
-              <button
+             <button
                 onClick={confirmCreateInvoice}
                 disabled={
                   createInvoiceMutation.isPending || !invoiceFormData.dueDate
@@ -1810,12 +1814,12 @@ Growth Grain Services`;
                 {createInvoiceMutation.isPending ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Creating Invoice...
+                    {areAllContractsInvoiced(selectedRows) ? 'Updating Invoice...' : 'Creating Invoice...'}
                   </>
                 ) : (
                   <>
                     <MdCheckCircle />
-                    Create Invoice in Xero
+                    {areAllContractsInvoiced(selectedRows) ? 'Update Invoice in Xero' : 'Create Invoice in Xero'}
                   </>
                 )}
               </button>

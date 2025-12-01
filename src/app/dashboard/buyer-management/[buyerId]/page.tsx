@@ -188,7 +188,9 @@ const BuyerInformationPage = () => {
           {/* Main Buyer Information */}
           <div className="w-full border border-gray-300 rounded-md overflow-hidden">
             <div className="bg-gray-100 border-b border-gray-300 p-3">
-              <h3 className="font-semibold text-gray-700">General Information</h3>
+              <h3 className="font-semibold text-gray-700">
+                General Information
+              </h3>
             </div>
             <div className="grid grid-cols-2">
               {[
@@ -220,24 +222,45 @@ const BuyerInformationPage = () => {
                 </h3>
               </div>
               <div className="divide-y divide-gray-300">
-                {buyerData.contacts.map((contact: ContactDetails, index: number) => (
-                  <div key={index} className="p-4 hover:bg-gray-50">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <p className="text-xs text-gray-500 uppercase mb-1">Contact Name</p>
-                        <p className="font-medium text-gray-900">{contact.name}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 uppercase mb-1">Email</p>
-                        <p className="text-gray-900">{contact.email || "-"}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 uppercase mb-1">Phone Number</p>
-                        <p className="text-gray-900">{contact.phoneNumber || "-"}</p>
+                {buyerData.contacts.map(
+                  (contact: ContactDetails, index: number) => (
+                    <div key={index} className="p-4 hover:bg-gray-50">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase mb-1">
+                            Contact Name
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-900">
+                              {contact.name}
+                            </p>
+                            {contact.isPrimary === true && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                                Primary
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase mb-1">
+                            Email
+                          </p>
+                          <p className="text-gray-900">
+                            {contact.email || "-"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase mb-1">
+                            Phone Number
+                          </p>
+                          <p className="text-gray-900">
+                            {contact.phoneNumber || "-"}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             </div>
           )}
@@ -246,7 +269,9 @@ const BuyerInformationPage = () => {
           {(!buyerData.contacts || buyerData.contacts.length === 0) && (
             <div className="w-full border border-gray-300 rounded-md overflow-hidden">
               <div className="bg-gray-100 border-b border-gray-300 p-3">
-                <h3 className="font-semibold text-gray-700">Contact Information</h3>
+                <h3 className="font-semibold text-gray-700">
+                  Contact Information
+                </h3>
               </div>
               <div className="p-8 text-center text-gray-500">
                 <p>No contact information available</p>

@@ -454,7 +454,8 @@ const SellerInformationEditPage = () => {
     }
 
     const contactExists = sellerData?.contactName.some(
-      (contact) => contact.email.toLowerCase() === newContact.email.toLowerCase()
+      (contact) =>
+        contact.email.toLowerCase() === newContact.email.toLowerCase()
     );
 
     if (contactExists) {
@@ -628,7 +629,7 @@ const SellerInformationEditPage = () => {
 
   return (
     <div>
-      <Toaster/>
+      <Toaster />
       <div className="border-b border-gray-300 py-10">
         <div className="mx-auto max-w-6xl flex justify-between items-center px-4">
           <div className="flex items-center gap-5">
@@ -893,6 +894,7 @@ const SellerInformationEditPage = () => {
             </div>
 
             {/* Contacts Section */}
+            {/* Contacts Section */}
             <div className="md:col-span-2">
               <label className="text-sm font-medium text-gray-700 mb-2 block">
                 Contact Information *
@@ -907,9 +909,16 @@ const SellerInformationEditPage = () => {
                       className="border border-gray-200 rounded-md p-3 bg-gray-50"
                     >
                       <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium text-gray-700 text-sm">
-                          Contact {index + 1}
-                        </h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-medium text-gray-700 text-sm">
+                            Contact {index + 1}
+                          </h4>
+                          {contact.isPrimary === true && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                              Primary
+                            </span>
+                          )}
+                        </div>
                         <button
                           type="button"
                           onClick={() => removeContact(index)}
@@ -967,6 +976,40 @@ const SellerInformationEditPage = () => {
                             className="w-full p-2 text-sm border border-gray-300 rounded focus:outline-none focus:border-green-700"
                           />
                         </div>
+                      </div>
+                      {/* Primary Contact Checkbox */}
+                      <div className="mt-3 flex items-center">
+                        <input
+                          type="checkbox"
+                          id={`primary-${index}`}
+                          checked={contact.isPrimary === true}
+                          onChange={(e) => {
+                            setSellerData((prev) => {
+                              if (!prev) return prev;
+                              const updatedContacts = prev.contactName.map(
+                                (c, i) => ({
+                                  ...c,
+                                  isPrimary:
+                                    i === index ? e.target.checked : false,
+                                })
+                              );
+                              const updated = {
+                                ...prev,
+                                contactName: updatedContacts,
+                              };
+                              setHasChanges(checkForChanges(updated));
+                              return updated;
+                            });
+                          }}
+                          disabled={updateSellerMutation.isPending}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <label
+                          htmlFor={`primary-${index}`}
+                          className="ml-2 text-sm text-gray-700"
+                        >
+                          Set as primary contact
+                        </label>
                       </div>
                     </div>
                   ))}
