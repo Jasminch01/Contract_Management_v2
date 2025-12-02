@@ -57,7 +57,11 @@ const EditableContract: React.FC<ContractProps> = ({
   const [uploadingBuyerContract, setUploadingBuyerContract] = useState(false);
   const [uploadingSellerContract, setUploadingSellerContract] = useState(false);
   const [preview, setPreview] = useState(false);
-  const [contract, setContract] = useState({...initialContract,  buyerContractReference: "",sellerContractReference: "", });
+  const [contract, setContract] = useState({
+    ...initialContract,
+    buyerContractReference: "",
+    sellerContractReference: "",
+  });
   const [hasChanges, setHasChanges] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showBrokeragePayableDropdown, setShowBrokeragePayableDropdown] =
@@ -131,30 +135,30 @@ const EditableContract: React.FC<ContractProps> = ({
         : contract.seller?._id)
   );
 
-  // Handle buyer selection from BuyerSelect component
+  // For updating buyer information
   const handleBuyerSelect = (buyer: Buyer) => {
-    setContract((prev) => ({
-      ...prev,
-      buyer: buyer._id,
-    }));
-    setHasChanges(true);
+    const primaryContact = buyer.contacts?.find((c) => c.isPrimary);
 
-    // Auto-select first contact if available
-    if (buyer.contacts && buyer.contacts.length > 0) {
-      const firstContact = buyer.contacts[0];
-      setSelectedBuyerContact(firstContact);
-      setContract((prev) => ({
-        ...prev,
-        buyerContact: firstContact,
-      }));
-    } else {
-      // No contacts available, clear contact field
-      setSelectedBuyerContact(null);
-      setContract((prev) => ({
-        ...prev,
-        buyerContact: undefined,
-      }));
-    }
+    setFormData((prev) => ({
+      ...prev,
+      buyer: buyer._id as string,
+      buyerContact: primaryContact,
+    }));
+  };
+
+  // For updating seller information
+  const handleSellerSelect = (seller: Seller) => {
+    const primaryContact = seller.contactName?.find(
+      (c) => c.isPrimary === true
+    );
+
+    setSelectedSeller(seller);
+
+    setFormData((prev) => ({
+      ...prev,
+      seller: seller._id as string,
+      sellerContact: primaryContact,
+    }));
   };
 
   const handleContactSelect = (contact: ContactDetails) => {
@@ -165,33 +169,6 @@ const EditableContract: React.FC<ContractProps> = ({
     }));
     setShowContactDropdown(false);
     setHasChanges(true);
-  };
-
-  // Handle seller selection from SellerSelect component
-  const handleSellerSelect = (selectedSeller: Seller) => {
-    setContract((prev) => ({
-      ...prev,
-      seller: selectedSeller._id,
-      ngrNumber: selectedSeller.mainNgr,
-    }));
-    setHasChanges(true);
-
-    // ✅ Auto-select first contact (if available)
-    if (selectedSeller.contactName && selectedSeller.contactName.length > 0) {
-      const firstContact = selectedSeller.contactName[0];
-      setSelectedSellerContact(firstContact);
-      setContract((prev) => ({
-        ...prev,
-        sellerContact: firstContact,
-      }));
-    } else {
-      // No contacts available, clear contact field
-      setSelectedSellerContact(null);
-      setContract((prev) => ({
-        ...prev,
-        sellerContact: undefined,
-      }));
-    }
   };
 
   const handleSellerContact = (contact: ContactDetails) => {

@@ -48,7 +48,7 @@ const PreviewContract: React.FC<PreviewContractProps> = ({
               {contract.conveyance === "Port Zone" ? (
                 <p>Contract Number : {contract?.contractNumber}</p>
               ) : (
-                <p>Buyer Contract : {contract?.contractNumber}</p>
+                <p>Buyer Contract : {contract?.buyerContractReference}</p>
               )}
             </div>
 

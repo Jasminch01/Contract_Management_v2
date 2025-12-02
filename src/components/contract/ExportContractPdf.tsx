@@ -181,7 +181,7 @@ const ExportContractPdf = ({ contracts }: { contracts: TContract[] }) => {
                   <Text style={contractPdfStyles.partyText}>
                     {contract.conveyance === "Port Zone"
                       ? `Contract Number : ${contract?.contractNumber}`
-                      : `Buyer Contract : ${contract?.contractNumber}`}
+                      : `Buyer Contract : ${contract?.buyerContractReference}`}
                   </Text>
                 </View>
 
