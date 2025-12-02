@@ -173,7 +173,7 @@ const ExportContractPdf = ({ contracts }: { contracts: TContract[] }) => {
                     ABN : {contract.buyer?.abn || "N/A"}
                   </Text>
                   <Text style={contractPdfStyles.partyText}>
-                    Email : {contract?.buyerContact?.email}
+                    Email : {contract?.buyerContact?.email || contract?.buyer?.email}
                   </Text>
                   <Text style={contractPdfStyles.partyText}>
                     Contact : {contract?.buyerContact?.name}
@@ -197,11 +197,11 @@ const ExportContractPdf = ({ contracts }: { contracts: TContract[] }) => {
                     NGR : {contract.ngrNumber || "N/A"}
                   </Text>
                   <Text style={contractPdfStyles.partyText}>
-                    Email : {contract.sellerContact?.email}
+                    Email : {contract.sellerContact?.email || contract?.seller?.email}
                   </Text>
                   <Text style={contractPdfStyles.partyText}>
                     Contact : {contract?.sellerContact?.name}{" "}
-                    {contract?.sellerContact?.phoneNumber}
+                    {contract?.sellerContact?.phoneNumber || contract?.seller?.phoneNumber}
                   </Text>
                   <Text style={contractPdfStyles.partyText}>
                     ABN : {contract?.seller?.abn}
