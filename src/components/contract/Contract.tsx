@@ -36,12 +36,12 @@ const Contract: React.FC<ContractProps> = ({ contract }) => {
                 <p>{contract?.buyer?.name}</p>
                 <p>{contract?.buyer?.officeAddress}</p>
                 <p>ABN : {contract?.buyer?.abn}</p>
-                <p>Email : {contract?.buyerContact?.email}</p>
-                <p>Contact : {contract?.buyerContact?.name}</p>
+                <p>Email : {contract?.buyerContact?.email || contract?.buyer?.email}</p>
+                <p>Contact : {contract?.buyerContact?.name || contract?.buyer?.name}</p>
                 {contract.conveyance === "Port Zone" ? (
-                  <p>Contract Number : {contract?.contractNumber}</p>
+                  <p>Contract Number : {contract?.buyerContractReference}</p>
                 ) : (
-                  <p> Buyer Contract : {contract?.contractNumber}</p>
+                  <p> Buyer Contract : {contract?.buyerContractReference}</p>
                 )}
               </div>
 
@@ -50,10 +50,10 @@ const Contract: React.FC<ContractProps> = ({ contract }) => {
                 <p>{contract.seller.legalName}</p>
                 <p>{contract.seller.address}</p>
                 <p>NGR : {contract.ngrNumber || "N/A"}</p>
-                <p>Email : {contract.sellerContact?.email}</p>
+                <p>Email : {contract.sellerContact?.email || contract?.seller?.legalName}</p>
                 <p>
                   Contact : {contract?.sellerContact?.name}{" "}
-                  {contract?.seller.phoneNumber}
+                  {contract?.seller?.phoneNumber}
                 </p>
                 <p>ABN : {contract?.seller?.abn}</p>
               </div>
@@ -430,7 +430,7 @@ const Contract: React.FC<ContractProps> = ({ contract }) => {
                 Buyer contract Reference
               </div>
               <div className="w-1/2 p-3">
-                {contract.buyerContractReference || "N/A"}
+                {contract?.buyerContractReference || "N/A"}
               </div>
             </div>
           </div>
@@ -533,7 +533,7 @@ const Contract: React.FC<ContractProps> = ({ contract }) => {
                 Seller Contract Reference
               </div>
               <div className="w-1/2 p-3">
-                {contract.sellerContractReference || "N/A"}
+                {contract?.sellerContractReference || "N/A"}
               </div>
             </div>
           </div>
@@ -574,13 +574,13 @@ const Contract: React.FC<ContractProps> = ({ contract }) => {
             <div className="flex border-b border-gray-300">
               <div className="w-1/2 p-3 text-[#1A1A1A] font-medium">Email</div>
               <div className="w-1/2 p-3">
-                {contract.buyerContact?.email || "N/A"}
+                {contract?.buyerContact?.email || contract?.buyer?.email || "N/A"}
               </div>
             </div>
             <div className="flex">
               <div className="w-1/2 p-3 text-[#1A1A1A] font-medium">Phone</div>
               <div className="w-1/2 p-3">
-                {contract.buyerContact?.phoneNumber || "N/A"}
+                {contract?.buyerContact?.phoneNumber || contract?.buyer?.phoneNumber || "N/A"}
               </div>
             </div>
           </div>
@@ -631,13 +631,13 @@ const Contract: React.FC<ContractProps> = ({ contract }) => {
             <div className="flex border-b border-gray-300">
               <div className="w-1/2 p-3 text-[#1A1A1A] font-medium">Email</div>
               <div className="w-1/2 p-3">
-                {contract.sellerContact?.email || "N/A"}
+                {contract.sellerContact?.email || contract?.seller?.email || "N/A"}
               </div>
             </div>
             <div className="flex">
               <div className="w-1/2 p-3 text-[#1A1A1A] font-medium">Phone</div>
               <div className="w-1/2 p-3">
-                {contract.sellerContact?.phoneNumber || "N/A"}
+                {contract.sellerContact?.phoneNumber || contract?.seller?.phoneNumber || "N/A"}
               </div>
             </div>
           </div>

@@ -102,7 +102,7 @@ const EditableContract: React.FC<ContractProps> = ({
     queryKey: ["buyers"],
     queryFn: () => getBuyers({ limit: 100 }),
     staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000, 
+    gcTime: 10 * 60 * 1000,
   });
   const sellers = sellersResponse?.data || [];
   const buyers = buyersResponse?.data || [];
@@ -267,7 +267,6 @@ const EditableContract: React.FC<ContractProps> = ({
     setHasChanges(true);
   };
 
-  // Handle buyer selection from BuyerSelect component
   const handleBuyerSelect = (buyer: Buyer) => {
     setContract((prev) => ({
       ...prev,
@@ -275,13 +274,17 @@ const EditableContract: React.FC<ContractProps> = ({
     }));
     setHasChanges(true);
 
-    // Auto-select first contact if available
+    // Auto-select primary contact if available, otherwise select first contact
     if (buyer.contacts && buyer.contacts.length > 0) {
-      const firstContact = buyer.contacts[0];
-      setSelectedBuyerContact(firstContact);
+      const primaryContact = buyer.contacts.find(
+        (contact) => contact.isPrimary
+      );
+      const selectedContact = primaryContact || buyer.contacts[0];
+
+      setSelectedBuyerContact(selectedContact);
       setContract((prev) => ({
         ...prev,
-        buyerContact: firstContact,
+        buyerContact: selectedContact,
       }));
     } else {
       // No contacts available, clear contact field
@@ -312,20 +315,24 @@ const EditableContract: React.FC<ContractProps> = ({
     }));
     setHasChanges(true);
 
-    // ✅ Auto-select first contact (if available)
+    // Auto-select primary contact if available, otherwise select first contact
     if (selectedSeller.contactName && selectedSeller.contactName.length > 0) {
-      const firstContact = selectedSeller.contactName[0];
-      setSelectedSellerContact(firstContact);
+      const primaryContact = selectedSeller.contactName.find(
+        (contact) => contact.isPrimary
+      );
+      const selectedContact = primaryContact || selectedSeller.contactName[0];
+
+      setSelectedSellerContact(selectedContact);
       setContract((prev) => ({
         ...prev,
-        sellerContact: firstContact,
+        sellerContact: selectedContact,
       }));
     } else {
       // No contacts available, clear contact field
       setSelectedSellerContact(null);
       setContract((prev) => ({
         ...prev,
-        sellerContact: undefined,
+        sellerContact: null,
       }));
     }
   };
@@ -497,7 +504,7 @@ const EditableContract: React.FC<ContractProps> = ({
     };
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const {_id, createdAt, updatedAt,_v,contractNumber,
+    const { _id,createdAt, updatedAt, _v, contractNumber,
       ...updatedContract
     } = contractToSave;
     updateContractMutation.mutate(updatedContract);
