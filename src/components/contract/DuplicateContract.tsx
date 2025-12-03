@@ -137,28 +137,63 @@ const EditableContract: React.FC<ContractProps> = ({
 
   // For updating buyer information
   const handleBuyerSelect = (buyer: Buyer) => {
-    const primaryContact = buyer.contacts?.find((c) => c.isPrimary);
-
-    setFormData((prev) => ({
+    setContract((prev) => ({
       ...prev,
-      buyer: buyer._id as string,
-      buyerContact: primaryContact,
+      buyer: buyer._id,
     }));
+    setHasChanges(true);
+
+    // Auto-select primary contact if available, otherwise select first contact
+    if (buyer.contacts && buyer.contacts.length > 0) {
+      const primaryContact = buyer.contacts.find(
+        (contact) => contact.isPrimary
+      );
+      const selectedContact = primaryContact || buyer.contacts[0];
+
+      setSelectedBuyerContact(selectedContact);
+      setContract((prev) => ({
+        ...prev,
+        buyerContact: selectedContact,
+      }));
+    } else {
+      // No contacts available, clear contact field
+      setSelectedBuyerContact(null);
+      setContract((prev) => ({
+        ...prev,
+        buyerContact: null,
+      }));
+    }
   };
 
   // For updating seller information
-  const handleSellerSelect = (seller: Seller) => {
-    const primaryContact = seller.contactName?.find(
-      (c) => c.isPrimary === true
-    );
-
-    setSelectedSeller(seller);
-
-    setFormData((prev) => ({
+  const handleSellerSelect = (selectedSeller: Seller) => {
+    setContract((prev) => ({
       ...prev,
-      seller: seller._id as string,
-      sellerContact: primaryContact,
+      seller: selectedSeller._id,
+      ngrNumber: selectedSeller.mainNgr,
     }));
+    setHasChanges(true);
+
+    // Auto-select primary contact if available, otherwise select first contact
+    if (selectedSeller.contactName && selectedSeller.contactName.length > 0) {
+      const primaryContact = selectedSeller.contactName.find(
+        (contact) => contact.isPrimary
+      );
+      const selectedContact = primaryContact || selectedSeller.contactName[0];
+
+      setSelectedSellerContact(selectedContact);
+      setContract((prev) => ({
+        ...prev,
+        sellerContact: selectedContact,
+      }));
+    } else {
+      // No contacts available, clear contact field
+      setSelectedSellerContact(null);
+      setContract((prev) => ({
+        ...prev,
+        sellerContact: undefined,
+      }));
+    }
   };
 
   const handleContactSelect = (contact: ContactDetails) => {
