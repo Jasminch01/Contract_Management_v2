@@ -21,9 +21,7 @@ import {
   Seller,
   TContract,
 } from "@/types/types";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getsellers } from "@/api/sellerApi";
-import { getBuyers } from "@/api/buyerApi";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import PreviewContract from "./PreviewContract";
 import { createContract } from "@/api/ContractAPi";
 import toast from "react-hot-toast";
@@ -47,6 +45,12 @@ const EditableContract: React.FC<ContractProps> = ({
     null,
   ]);
   const [showContactDropdown, setShowContactDropdown] = useState(false);
+  const [selectedBuyer, setSelectedBuyer] = useState<Buyer | null>(
+    initialContract.buyer || null
+  );
+  const [selectedSeller, setSelectedSeller] = useState<Buyer | null>(
+    initialContract.seller || null
+  );
   const [showSellerContactDropdown, setShowSellerContactDropdown] =
     useState(false);
   const [selectedBuyerContact, setSelectedBuyerContact] =
@@ -103,40 +107,9 @@ const EditableContract: React.FC<ContractProps> = ({
     }
   };
 
-  const { data: sellersResponse } = useQuery({
-    queryKey: ["sellers"],
-    queryFn: () => getsellers({ limit: 100 }), // Pass parameters and call as function
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
-  });
-
-  const { data: buyersResponse } = useQuery({
-    queryKey: ["buyers"],
-    queryFn: () => getBuyers({ limit: 100 }), // Pass parameters and call as function
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
-  });
-  const sellers = sellersResponse?.data || [];
-  const buyers = buyersResponse?.data || [];
-
-  // Get the selected buyer and seller objects for display
-  const selectedBuyer = buyers.find(
-    (buyer: Buyer) =>
-      buyer._id ===
-      (typeof contract.buyer === "string"
-        ? contract.buyer
-        : contract.buyer?._id)
-  );
-  const selectedSeller = sellers.find(
-    (seller: Seller) =>
-      seller._id ===
-      (typeof contract.seller === "string"
-        ? contract.seller
-        : contract.seller?._id)
-  );
-
   // For updating buyer information
   const handleBuyerSelect = (buyer: Buyer) => {
+    setSelectedBuyer(buyer);
     setContract((prev) => ({
       ...prev,
       buyer: buyer._id,
@@ -167,6 +140,7 @@ const EditableContract: React.FC<ContractProps> = ({
 
   // For updating seller information
   const handleSellerSelect = (selectedSeller: Seller) => {
+    setSelectedSeller(selectedSeller);
     setContract((prev) => ({
       ...prev,
       seller: selectedSeller._id,
@@ -1074,10 +1048,19 @@ const EditableContract: React.FC<ContractProps> = ({
                   selectedBuyer.contacts.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto">
                       {selectedBuyer.contacts.map((contact, index) => {
+                        // Check multiple ways to determine if selected
+                        const currentContactEmail =
+                          selectedBuyerContact?.email ||
+                          contract.buyerContact?.email;
+                        const currentContactName =
+                          selectedBuyerContact?.name ||
+                          contract.buyerContact?.name;
+
                         const isSelected =
-                          contact.email ===
-                          (selectedBuyerContact?.email ||
-                            contract.buyerContact?.email);
+                          (currentContactEmail &&
+                            contact.email === currentContactEmail) ||
+                          (currentContactName &&
+                            contact.name === currentContactName);
 
                         return (
                           <div
