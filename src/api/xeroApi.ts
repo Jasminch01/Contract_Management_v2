@@ -31,7 +31,7 @@ export const createXeroInvoice = async (
       "/xero/create-invoice",
       invoiceData
     );
-    console.log(data);
+    // console.log(data);
     return data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -66,8 +66,8 @@ export const authorizeXero = (): Promise<boolean> => {
       // Verify origin for security
       const allowedOrigins = [
         process.env.NEXT_PUBLIC_BASE_URL,
-        "http://localhost:8000",
-        "http://localhost:3000",
+        // "http://localhost:8000",
+        // "http://localhost:3000",
         window.location.origin,
       ];
 
