@@ -41,14 +41,14 @@ const PreviewContract: React.FC<PreviewContractProps> = ({
               <p>{selectedBuyer?.name}</p>
               <p>{selectedBuyer?.officeAddress}</p>
               <p>ABN : {selectedBuyer?.abn}</p>
-              <p>Email : {contract.buyerContact?.email}</p>
+              <p>Email : {contract.buyerContact?.email || contract?.buyer?.email}</p>
               <p>
-                Contact : {contract.buyerContact?.name}
+                Contact : {contract.buyerContact?.name || contract?.buyer?.name}
               </p>
               {contract.conveyance === "Port Zone" ? (
-                <p>Contract Number : {contract?.contractNumber}</p>
+                <p>Contract Number : {contract?.buyerContractReference}</p>
               ) : (
-                <p>Buyer Contract : {contract?.contractNumber}</p>
+                <p>Buyer Contract : {contract?.buyerContractReference}</p>
               )}
             </div>
 
@@ -57,10 +57,10 @@ const PreviewContract: React.FC<PreviewContractProps> = ({
               <p>{selectedSeller?.legalName}</p>
               <p>{selectedSeller?.address}</p>
               <p>NGR : {contract.ngrNumber || "N/A"}</p>
-              <p>Email : {contract.sellerContact?.email}</p>
+              <p>Email : {contract.sellerContact?.email || contract?.seller?.email}</p>
               <p>
-                Contact : {contract?.sellerContact?.name}{" "}
-                {contract?.sellerContact?.phoneNumber}
+                Contact : {contract?.sellerContact?.name || contract?.seller?.legalName}{" "}
+                {contract?.sellerContact?.phoneNumber || contract?.seller?.phoneNumber}
               </p>
               <p>ABN : {contract?.seller?.abn}</p>
             </div>

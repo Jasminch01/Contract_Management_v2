@@ -23,9 +23,7 @@ import {
   TContract,
   TUpdateContract,
 } from "@/types/types";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getsellers } from "@/api/sellerApi";
-import { getBuyers } from "@/api/buyerApi";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import PreviewContract from "./PreviewContract";
 import { updateContract } from "@/api/ContractAPi";
 import toast from "react-hot-toast";
@@ -67,6 +65,12 @@ const EditableContract: React.FC<ContractProps> = ({
     null,
   ]);
   const [showContactDropdown, setShowContactDropdown] = useState(false);
+  const [selectedBuyer, setSelectedBuyer] = useState<Buyer | null>(
+    initialContract.buyer || null
+  );
+  const [selectedSeller, setSelectedSeller] = useState<Buyer | null>(
+    initialContract.seller || null
+  );
   const [showSellerContactDropdown, setShowSellerContactDropdown] =
     useState(false);
   const [selectedBuyerContact, setSelectedBuyerContact] =
@@ -89,39 +93,12 @@ const EditableContract: React.FC<ContractProps> = ({
   const queryClient = useQueryClient();
 
   const [startDate, endDate] = dateRange;
-  const statusOptions: ContractStatus[] = ["Incomplete", "Complete", "Draft"];
-
-  const { data: sellersResponse } = useQuery({
-    queryKey: ["sellers"],
-    queryFn: () => getsellers({ limit: 100 }),
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-  });
-
-  const { data: buyersResponse } = useQuery({
-    queryKey: ["buyers"],
-    queryFn: () => getBuyers({ limit: 100 }),
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000, 
-  });
-  const sellers = sellersResponse?.data || [];
-  const buyers = buyersResponse?.data || [];
-
-  // Get the selected buyer and seller objects for display
-  const selectedBuyer = buyers.find(
-    (buyer: Buyer) =>
-      buyer._id ===
-      (typeof contract.buyer === "string"
-        ? contract.buyer
-        : contract.buyer?._id)
-  );
-  const selectedSeller = sellers.find(
-    (seller: Seller) =>
-      seller._id ===
-      (typeof contract.seller === "string"
-        ? contract.seller
-        : contract.seller?._id)
-  );
+  const statusOptions: ContractStatus[] = [
+    "Incomplete",
+    "Complete",
+    "Draft",
+    "Menually-Invoiced",
+  ];
 
   // Cloudinary upload function
   const uploadToCloudinary = async (file: File): Promise<string> => {
@@ -267,21 +244,25 @@ const EditableContract: React.FC<ContractProps> = ({
     setHasChanges(true);
   };
 
-  // Handle buyer selection from BuyerSelect component
   const handleBuyerSelect = (buyer: Buyer) => {
+    setSelectedBuyer(buyer);
     setContract((prev) => ({
       ...prev,
       buyer: buyer._id,
     }));
     setHasChanges(true);
 
-    // Auto-select first contact if available
+    // Auto-select primary contact if available, otherwise select first contact
     if (buyer.contacts && buyer.contacts.length > 0) {
-      const firstContact = buyer.contacts[0];
-      setSelectedBuyerContact(firstContact);
+      const primaryContact = buyer.contacts.find(
+        (contact) => contact.isPrimary
+      );
+      const selectedContact = primaryContact || buyer.contacts[0];
+
+      setSelectedBuyerContact(selectedContact);
       setContract((prev) => ({
         ...prev,
-        buyerContact: firstContact,
+        buyerContact: selectedContact,
       }));
     } else {
       // No contacts available, clear contact field
@@ -305,6 +286,7 @@ const EditableContract: React.FC<ContractProps> = ({
 
   // Handle seller selection from SellerSelect component
   const handleSellerSelect = (selectedSeller: Seller) => {
+    setSelectedSeller(selectedSeller);
     setContract((prev) => ({
       ...prev,
       seller: selectedSeller._id,
@@ -312,20 +294,24 @@ const EditableContract: React.FC<ContractProps> = ({
     }));
     setHasChanges(true);
 
-    // ✅ Auto-select first contact (if available)
+    // Auto-select primary contact if available, otherwise select first contact
     if (selectedSeller.contactName && selectedSeller.contactName.length > 0) {
-      const firstContact = selectedSeller.contactName[0];
-      setSelectedSellerContact(firstContact);
+      const primaryContact = selectedSeller.contactName.find(
+        (contact) => contact.isPrimary
+      );
+      const selectedContact = primaryContact || selectedSeller.contactName[0];
+
+      setSelectedSellerContact(selectedContact);
       setContract((prev) => ({
         ...prev,
-        sellerContact: firstContact,
+        sellerContact: selectedContact,
       }));
     } else {
       // No contacts available, clear contact field
       setSelectedSellerContact(null);
       setContract((prev) => ({
         ...prev,
-        sellerContact: undefined,
+        sellerContact: null,
       }));
     }
   };
@@ -497,7 +483,7 @@ const EditableContract: React.FC<ContractProps> = ({
     };
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const {_id, createdAt, updatedAt,_v,contractNumber,
+    const { _id,createdAt,updatedAt, _v, contractNumber,
       ...updatedContract
     } = contractToSave;
     updateContractMutation.mutate(updatedContract);
@@ -1024,10 +1010,19 @@ const EditableContract: React.FC<ContractProps> = ({
                   selectedBuyer.contacts.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto">
                       {selectedBuyer.contacts.map((contact, index) => {
+                        // Check multiple ways to determine if selected
+                        const currentContactEmail =
+                          selectedBuyerContact?.email ||
+                          contract.buyerContact?.email;
+                        const currentContactName =
+                          selectedBuyerContact?.name ||
+                          contract.buyerContact?.name;
+
                         const isSelected =
-                          contact.email ===
-                          (selectedBuyerContact?.email ||
-                            contract.buyerContact?.email);
+                          (currentContactEmail &&
+                            contact.email === currentContactEmail) ||
+                          (currentContactName &&
+                            contact.name === currentContactName);
 
                         return (
                           <div
@@ -1294,7 +1289,8 @@ const EditableContract: React.FC<ContractProps> = ({
               <div className="w-1/2 p-3 text-[#1A1A1A] font-medium">Phone</div>
               <div className="w-1/2 p-3">
                 <div className="w-full p-1 rounded bg-gray-50">
-                  {contract.sellerContact?.phoneNumber ||
+                  {selectedSellerContact?.phoneNumber ||
+                    contract.sellerContact?.phoneNumber ||
                     selectedSeller?.phoneNumber ||
                     ""}
                 </div>

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import DataTable from "react-data-table-component";
@@ -14,7 +14,11 @@ import { RiCircleFill, RiDeleteBin6Fill } from "react-icons/ri";
 import ExportCsv from "@/components/contract/ExportCsv";
 import PdfExportButton from "@/components/contract/PdfExportButton";
 import AdvanceSearchFilter from "@/components/contract/AdvanceSearchFilter";
-import { fetchContracts, moveContractToTrash } from "@/api/ContractAPi";
+import {
+  fetchContracts,
+  moveContractToTrash,
+  sendContractEmail,
+} from "@/api/ContractAPi";
 import {
   TContract,
   FetchContractsParams,
@@ -184,7 +188,8 @@ const columns = [
           className={`${
             row.status?.toLowerCase() === "complete"
               ? "text-[#108A2B]"
-              : row.status?.toLowerCase() === "invoiced"
+              : row.status?.toLowerCase() === "invoiced" ||
+                row.status?.toLowerCase() === "menually-invoiced"
               ? "text-[#3B82F6]"
               : row.status?.toLowerCase() === "draft"
               ? "text-[#EF4444]"
@@ -236,6 +241,7 @@ const statusOptions = [
   { value: "Complete", label: "Complete" },
   { value: "Incomplete", label: "Incomplete" },
   { value: "Invoiced", label: "Invoiced" },
+  { value: "Menually-Invoiced", label: "Menually-Invoiced" },
   { value: "Draft", label: "Draft" },
 ];
 
@@ -252,6 +258,11 @@ const ContractManagementPage = () => {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isFilterActive, setIsFilterActive] = useState(false);
   const [toggleCleared, setToggleCleared] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailRecipientType, setEmailRecipientType] = useState<
+    "buyer" | "seller"
+  >("buyer");
+  const [emailAdditionalText, setEmailAdditionalText] = useState("");
 
   // Initialize pagination state with stored filters
   const getInitialPaginationState = (): PaginationState => {
@@ -466,9 +477,13 @@ const ContractManagementPage = () => {
     },
   });
 
-    const areAllContractsInvoiced = (contracts: TContract[]): boolean => {
-    return contracts.length > 0 && 
-      contracts.every(contract => contract.status?.toLowerCase() === 'invoiced');
+  const areAllContractsInvoiced = (contracts: TContract[]): boolean => {
+    return (
+      contracts.length > 0 &&
+      contracts.every(
+        (contract) => contract.status?.toLowerCase() === "invoiced"
+      )
+    );
   };
   // Group contracts by invoice recipient (based on brokeragePayableBy)
   const groupContractsByInvoiceRecipient = (contracts: TContract[]) => {
@@ -1079,7 +1094,7 @@ const ContractManagementPage = () => {
     }
   };
 
-  const handleEmail = async (recipientType: "buyer" | "seller") => {
+  const handleEmail = (recipientType: "buyer" | "seller") => {
     if (selectedRows.length === 0) {
       toast.error(
         `Please select at least one contract to email ${recipientType}`
@@ -1087,89 +1102,90 @@ const ContractManagementPage = () => {
       return;
     }
 
+    const validRows = selectedRows.filter(
+      (row): row is TContract => row != null
+    );
+
+    const recipients = validRows
+      .map((row) =>
+        recipientType === "buyer" ? row.buyer?.email : row.seller?.email
+      )
+      .filter((email): email is string => Boolean(email));
+
+    if (recipients.length === 0) {
+      toast.error(
+        `No valid ${recipientType} emails found in selected contracts`
+      );
+      return;
+    }
+
+    // Set recipient type and open modal
+    setEmailRecipientType(recipientType);
+    setEmailAdditionalText("");
+    setIsEmailModalOpen(true);
+  };
+
+  const confirmSendEmail = async () => {
     try {
-      toast.loading("Generating PDF and preparing email...");
+      toast.loading("Generating PDF and sending email...");
 
       const validRows = selectedRows.filter(
         (row): row is TContract => row != null
       );
+
       const recipients = validRows
         .map((row) =>
-          recipientType === "buyer" ? row.buyer?.email : row.seller?.email
+          emailRecipientType === "buyer" ? row.buyer?.email : row.seller?.email
         )
         .filter((email): email is string => Boolean(email));
-
-      if (recipients.length === 0) {
-        toast.error(
-          `No valid ${recipientType} emails found in selected contracts`
-        );
-        return;
-      }
 
       const pdfBlob = await generatePDFBlobFromComponent(validRows);
 
       if (!pdfBlob) {
+        toast.dismiss();
         throw new Error("Failed to generate PDF");
       }
 
-      const filename = `contracts_${recipientType}_${Date.now()}.pdf`;
-      const cloudinaryResponse = await uploadPDFToCloudinary(pdfBlob, filename);
-
-      let subject;
-      const contract = validRows[0];
-      if (recipientType === "seller" && validRows.length === 1) {
-        subject = `Broker Note - ${contract.contractNumber || ""} ${
-          contract.tonnes || 0
-        }mt ${contract.grade || ""} ${contract.deliveryOption || "Delivered"} ${
-          contract.deliveryDestination || ""
-        }`;
-      } else {
-        subject = `${validRows.length} Contract(s) - ${
-          recipientType === "buyer" ? "Buyer" : "Seller"
-        } Documents`;
-      }
-
-      const contractSummary = validRows
-        .map(
-          (contract) =>
-            `• ${contract.contractNumber} - ${contract.tonnes}mt ${contract.grade} (${contract.buyer?.name} ↔ ${contract.seller?.legalName})`
-        )
-        .join("\n");
-
-      const emailBody = `Dear ${
-        recipientType.charAt(0).toUpperCase() + recipientType.slice(1)
-      },
-
-Please find the contract document(s) attached below:
-
-${contractSummary}
-
-📎 Download PDF: ${cloudinaryResponse.secure_url}
-
-If you have any questions, please don't hesitate to contact us.
-
-Best regards,
-Growth Grain Services`;
-
-      const outlookLink = `mailto:${recipients.join(
-        ","
-      )}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(
-        emailBody
-      )}`;
-
-      toast.dismiss();
-      window.location.href = outlookLink;
-
-      toast.success(
-        `Email prepared with PDF for ${recipients.length} ${recipientType}(s)`
+      // Convert blob to FormData
+      const formData = new FormData();
+      formData.append(
+        "pdf",
+        pdfBlob,
+        `contracts_${emailRecipientType}_${Date.now()}.pdf`
       );
-    } catch (error) {
+      formData.append("recipients", JSON.stringify(recipients));
+      formData.append("recipientType", emailRecipientType);
+      formData.append("contracts", JSON.stringify(validRows));
+      formData.append("additionalText", emailAdditionalText);
+
+      // Send to backend
+      const response = await sendContractEmail(formData as any);
       toast.dismiss();
-      console.error("Error preparing email with PDF:", error);
-      toast.error("Failed to generate PDF and prepare email");
+
+      if (response.success) {
+        toast.success(
+          `Email sent successfully to ${recipients.length} ${emailRecipientType}(s)!`,
+          { duration: 3000 }
+        );
+
+        // Close modal and reset form
+        setIsEmailModalOpen(false);
+        setEmailAdditionalText("");
+      } else {
+        throw new Error("Failed to send email");
+      }
+    } catch (error: any) {
+      toast.dismiss();
+      console.error("Error sending email:", error);
+
+      const errorMessage =
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to send email. Please try again.";
+
+      toast.error(errorMessage, { duration: 3000 });
     }
   };
-
   const generatePDFBlobFromComponent = async (
     contracts: TContract[]
   ): Promise<Blob | null> => {
@@ -1188,34 +1204,6 @@ Growth Grain Services`;
       console.error("Error generating PDF from component:", error);
       return null;
     }
-  };
-
-  const uploadPDFToCloudinary = async (
-    pdfBlob: Blob,
-    filename: string
-  ): Promise<any> => {
-    const formData = new FormData();
-    formData.append("file", pdfBlob, filename);
-    formData.append("resource_type", "raw");
-    formData.append(
-      "upload_preset",
-      process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!
-    );
-
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_CLOUDINARY_URL}${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/raw/upload`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to upload PDF to Cloudinary: ${errorText}`);
-    }
-
-    return response.json();
   };
 
   // Prevent hydration mismatch
@@ -1324,33 +1312,35 @@ Growth Grain Services`;
 
           {/* Action Buttons */}
           <div className="w-full md:w-auto lg:flex lg:flex-row gap-2 grid grid-cols-3">
-      <button
-        onClick={handleCreateInvoice}
-        disabled={
-          selectedRows.length === 0 ||
-          selectedRows[0]?.status?.toLowerCase() === "draft" ||
-          xeroStatus.isChecking
-        }
-        className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${
-          selectedRows.length > 0 &&
-          selectedRows[0]?.status?.toLowerCase() !== "draft" &&
-          !xeroStatus.isChecking
-            ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
-            : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
-        }`}
-      >
-        {xeroStatus.isChecking ? (
-          <>
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-            Checking...
-          </>
-        ) : (
-          <>
-            <IoReceiptOutline />
-            {areAllContractsInvoiced(selectedRows) ? 'Update Invoice' : 'Create Invoice'}
-          </>
-        )}
-      </button>
+            <button
+              onClick={handleCreateInvoice}
+              disabled={
+                selectedRows.length === 0 ||
+                selectedRows[0]?.status?.toLowerCase() === "draft" ||
+                xeroStatus.isChecking
+              }
+              className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${
+                selectedRows.length > 0 &&
+                selectedRows[0]?.status?.toLowerCase() !== "draft" &&
+                !xeroStatus.isChecking
+                  ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
+                  : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
+              }`}
+            >
+              {xeroStatus.isChecking ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <IoReceiptOutline />
+                  {areAllContractsInvoiced(selectedRows)
+                    ? "Update Invoice"
+                    : "Create Invoice"}
+                </>
+              )}
+            </button>
 
             <button
               onClick={handleDuplicate}
@@ -1804,7 +1794,7 @@ Growth Grain Services`;
               >
                 Cancel
               </button>
-             <button
+              <button
                 onClick={confirmCreateInvoice}
                 disabled={
                   createInvoiceMutation.isPending || !invoiceFormData.dueDate
@@ -1814,14 +1804,164 @@ Growth Grain Services`;
                 {createInvoiceMutation.isPending ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    {areAllContractsInvoiced(selectedRows) ? 'Updating Invoice...' : 'Creating Invoice...'}
+                    {areAllContractsInvoiced(selectedRows)
+                      ? "Updating Invoice..."
+                      : "Creating Invoice..."}
                   </>
                 ) : (
                   <>
                     <MdCheckCircle />
-                    {areAllContractsInvoiced(selectedRows) ? 'Update Invoice in Xero' : 'Create Invoice in Xero'}
+                    {areAllContractsInvoiced(selectedRows)
+                      ? "Update Invoice in Xero"
+                      : "Create Invoice in Xero"}
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Confirmation Modal */}
+      {isEmailModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50  bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold flex gap-x-3 items-center">
+                  <IoIosSend className="text-blue-600 text-2xl" />
+                  Send Email to{" "}
+                  {emailRecipientType === "buyer" ? "Buyer" : "Seller"}
+                </h3>
+              </div>
+            </div>
+
+            <div className="px-6 py-4">
+              {/* Recipient Summary */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <h4 className="font-semibold text-gray-800 mb-3">
+                  Email Recipients (
+                  {
+                    selectedRows.filter((row) =>
+                      emailRecipientType === "buyer"
+                        ? row.buyer?.email
+                        : row.seller?.email
+                    ).length
+                  }
+                  )
+                </h4>
+                <div className="space-y-2 text-sm">
+                  {selectedRows
+                    .filter((row) =>
+                      emailRecipientType === "buyer"
+                        ? row.buyer?.email
+                        : row.seller?.email
+                    )
+                    .map((contract, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className="text-gray-600">•</span>
+                        <span className="font-medium">
+                          {emailRecipientType === "buyer"
+                            ? contract.buyer?.name
+                            : contract.seller?.legalName}
+                        </span>
+                        <span className="text-gray-500">
+                          (
+                          {emailRecipientType === "buyer"
+                            ? contract.buyer?.email
+                            : contract.seller?.email}
+                          )
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {/* Contract Summary */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                <h4 className="font-semibold text-gray-800 mb-3">
+                  Contracts to be Sent ({selectedRows.length})
+                </h4>
+                <div className="space-y-2 text-sm max-h-40 overflow-y-auto">
+                  {selectedRows.map((contract, idx) => (
+                    <div key={idx} className="text-gray-700">
+                      • {contract.contractNumber} - {contract.tonnes}mt{" "}
+                      {contract.grade}({contract.buyer?.name} ↔{" "}
+                      {contract.seller?.legalName})
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Additional Message Input */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Additional Message (Optional)
+                  </label>
+                  <textarea
+                    value={emailAdditionalText}
+                    onChange={(e) => setEmailAdditionalText(e.target.value)}
+                    placeholder="Add any additional message to include in the email body..."
+                    rows={5}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    This text will be added to the standard email template
+                    before the contract summary.
+                  </p>
+                </div>
+
+                {/* Email Preview */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-800 mb-2 text-sm">
+                    Email Preview
+                  </h4>
+                  <div className="text-sm text-gray-700 space-y-2 whitespace-pre-wrap">
+                    <p>
+                      Dear {emailRecipientType === "buyer" ? "Buyer" : "Seller"}
+                      ,
+                    </p>
+                    {emailAdditionalText && (
+                      <p className="bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
+                        {emailAdditionalText}
+                      </p>
+                    )}
+                    <p>Please find the contract document(s) attached.</p>
+                    <p className="text-xs text-gray-500 italic">
+                      [Contract summary will be included here]
+                    </p>
+                    <p>
+                      If you have any questions, please don&apos;t hesitate to
+                      contact us.
+                    </p>
+                    <p>
+                      Best regards,
+                      <br />
+                      Growth Grain Services
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 sticky bottom-0 bg-white">
+              <button
+                onClick={() => {
+                  setIsEmailModalOpen(false);
+                  setEmailAdditionalText("");
+                }}
+                className="px-5 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSendEmail}
+                className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
+              >
+                <IoIosSend />
+                Send Email
               </button>
             </div>
           </div>

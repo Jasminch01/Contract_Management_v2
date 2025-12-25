@@ -21,9 +21,7 @@ import {
   Seller,
   TContract,
 } from "@/types/types";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getsellers } from "@/api/sellerApi";
-import { getBuyers } from "@/api/buyerApi";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import PreviewContract from "./PreviewContract";
 import { createContract } from "@/api/ContractAPi";
 import toast from "react-hot-toast";
@@ -47,6 +45,12 @@ const EditableContract: React.FC<ContractProps> = ({
     null,
   ]);
   const [showContactDropdown, setShowContactDropdown] = useState(false);
+  const [selectedBuyer, setSelectedBuyer] = useState<Buyer | null>(
+    initialContract.buyer || null
+  );
+  const [selectedSeller, setSelectedSeller] = useState<Buyer | null>(
+    initialContract.seller || null
+  );
   const [showSellerContactDropdown, setShowSellerContactDropdown] =
     useState(false);
   const [selectedBuyerContact, setSelectedBuyerContact] =
@@ -57,7 +61,11 @@ const EditableContract: React.FC<ContractProps> = ({
   const [uploadingBuyerContract, setUploadingBuyerContract] = useState(false);
   const [uploadingSellerContract, setUploadingSellerContract] = useState(false);
   const [preview, setPreview] = useState(false);
-  const [contract, setContract] = useState({...initialContract,  buyerContractReference: "",sellerContractReference: "", });
+  const [contract, setContract] = useState({
+    ...initialContract,
+    buyerContractReference: "",
+    sellerContractReference: "",
+  });
   const [hasChanges, setHasChanges] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showBrokeragePayableDropdown, setShowBrokeragePayableDropdown] =
@@ -66,7 +74,12 @@ const EditableContract: React.FC<ContractProps> = ({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [startDate, endDate] = dateRange;
-  const statusOptions: ContractStatus[] = ["Incomplete", "Complete", "Draft"];
+  const statusOptions: ContractStatus[] = [
+    "Incomplete",
+    "Complete",
+    "Draft",
+    "Menually-Invoiced",
+  ];
 
   // Cloudinary upload function
   const uploadToCloudinary = async (file: File): Promise<string> => {
@@ -99,60 +112,65 @@ const EditableContract: React.FC<ContractProps> = ({
     }
   };
 
-  const { data: sellersResponse } = useQuery({
-    queryKey: ["sellers"],
-    queryFn: () => getsellers({ limit: 100 }), // Pass parameters and call as function
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
-  });
-
-  const { data: buyersResponse } = useQuery({
-    queryKey: ["buyers"],
-    queryFn: () => getBuyers({ limit: 100 }), // Pass parameters and call as function
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
-  });
-  const sellers = sellersResponse?.data || [];
-  const buyers = buyersResponse?.data || [];
-
-  // Get the selected buyer and seller objects for display
-  const selectedBuyer = buyers.find(
-    (buyer: Buyer) =>
-      buyer._id ===
-      (typeof contract.buyer === "string"
-        ? contract.buyer
-        : contract.buyer?._id)
-  );
-  const selectedSeller = sellers.find(
-    (seller: Seller) =>
-      seller._id ===
-      (typeof contract.seller === "string"
-        ? contract.seller
-        : contract.seller?._id)
-  );
-
-  // Handle buyer selection from BuyerSelect component
+  // For updating buyer information
   const handleBuyerSelect = (buyer: Buyer) => {
+    setSelectedBuyer(buyer);
     setContract((prev) => ({
       ...prev,
       buyer: buyer._id,
     }));
     setHasChanges(true);
 
-    // Auto-select first contact if available
+    // Auto-select primary contact if available, otherwise select first contact
     if (buyer.contacts && buyer.contacts.length > 0) {
-      const firstContact = buyer.contacts[0];
-      setSelectedBuyerContact(firstContact);
+      const primaryContact = buyer.contacts.find(
+        (contact) => contact.isPrimary
+      );
+      const selectedContact = primaryContact || buyer.contacts[0];
+
+      setSelectedBuyerContact(selectedContact);
       setContract((prev) => ({
         ...prev,
-        buyerContact: firstContact,
+        buyerContact: selectedContact,
       }));
     } else {
       // No contacts available, clear contact field
       setSelectedBuyerContact(null);
       setContract((prev) => ({
         ...prev,
-        buyerContact: undefined,
+        buyerContact: null,
+      }));
+    }
+  };
+
+  // For updating seller information
+  const handleSellerSelect = (selectedSeller: Seller) => {
+    setSelectedSeller(selectedSeller);
+    setContract((prev) => ({
+      ...prev,
+      seller: selectedSeller._id,
+      ngrNumber: selectedSeller.mainNgr,
+    }));
+    setHasChanges(true);
+
+    // Auto-select primary contact if available, otherwise select first contact
+    if (selectedSeller.contactName && selectedSeller.contactName.length > 0) {
+      const primaryContact = selectedSeller.contactName.find(
+        (contact) => contact.isPrimary
+      );
+      const selectedContact = primaryContact || selectedSeller.contactName[0];
+
+      setSelectedSellerContact(selectedContact);
+      setContract((prev) => ({
+        ...prev,
+        sellerContact: selectedContact,
+      }));
+    } else {
+      // No contacts available, clear contact field
+      setSelectedSellerContact(null);
+      setContract((prev) => ({
+        ...prev,
+        sellerContact: undefined,
       }));
     }
   };
@@ -165,33 +183,6 @@ const EditableContract: React.FC<ContractProps> = ({
     }));
     setShowContactDropdown(false);
     setHasChanges(true);
-  };
-
-  // Handle seller selection from SellerSelect component
-  const handleSellerSelect = (selectedSeller: Seller) => {
-    setContract((prev) => ({
-      ...prev,
-      seller: selectedSeller._id,
-      ngrNumber: selectedSeller.mainNgr,
-    }));
-    setHasChanges(true);
-
-    // ✅ Auto-select first contact (if available)
-    if (selectedSeller.contactName && selectedSeller.contactName.length > 0) {
-      const firstContact = selectedSeller.contactName[0];
-      setSelectedSellerContact(firstContact);
-      setContract((prev) => ({
-        ...prev,
-        sellerContact: firstContact,
-      }));
-    } else {
-      // No contacts available, clear contact field
-      setSelectedSellerContact(null);
-      setContract((prev) => ({
-        ...prev,
-        sellerContact: undefined,
-      }));
-    }
   };
 
   const handleSellerContact = (contact: ContactDetails) => {
@@ -1062,10 +1053,19 @@ const EditableContract: React.FC<ContractProps> = ({
                   selectedBuyer.contacts.length > 0 && (
                     <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded shadow-lg max-h-48 overflow-y-auto">
                       {selectedBuyer.contacts.map((contact, index) => {
+                        // Check multiple ways to determine if selected
+                        const currentContactEmail =
+                          selectedBuyerContact?.email ||
+                          contract.buyerContact?.email;
+                        const currentContactName =
+                          selectedBuyerContact?.name ||
+                          contract.buyerContact?.name;
+
                         const isSelected =
-                          contact.email ===
-                          (selectedBuyerContact?.email ||
-                            contract.buyerContact?.email);
+                          (currentContactEmail &&
+                            contact.email === currentContactEmail) ||
+                          (currentContactName &&
+                            contact.name === currentContactName);
 
                         return (
                           <div
