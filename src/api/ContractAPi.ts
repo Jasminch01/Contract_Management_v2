@@ -1,4 +1,8 @@
-import { FetchContractsParams, TContract, TUpdateContract } from "@/types/types";
+import {
+  FetchContractsParams,
+  TContract,
+  TUpdateContract,
+} from "@/types/types";
 import { instance } from "./api";
 import axios, { AxiosResponse } from "axios";
 
@@ -20,7 +24,6 @@ interface ContractsPaginatedResponse {
   data: TContract[];
 }
 
-
 export const fetchContracts = async (
   params: FetchContractsParams = {}
 ): Promise<ContractsPaginatedResponse> => {
@@ -33,10 +36,9 @@ export const fetchContracts = async (
       }
     });
 
-    const response: AxiosResponse<ContractsPaginatedResponse> = await instance.get(
-      `contracts?${queryParams.toString()}`
-    );
-    console.log(response.data)
+    const response: AxiosResponse<ContractsPaginatedResponse> =
+      await instance.get(`contracts?${queryParams.toString()}`);
+
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -100,6 +102,26 @@ export const moveContractToTrash = async (
   } catch (error) {
     console.error("Move to trash error:", error);
 
+    throw error;
+  }
+};
+
+interface SendContractEmailRequest {
+  [key: string]: unknown;
+}
+
+interface SendContractEmailResponse {
+  success: boolean;
+  message: string;
+}
+
+export const sendContractEmail = async (
+  formData: SendContractEmailRequest
+): Promise<SendContractEmailResponse> => {
+  try {
+    const response = await instance.post("send-contract-email", formData);
+    return response.data;
+  } catch (error) {
     throw error;
   }
 };

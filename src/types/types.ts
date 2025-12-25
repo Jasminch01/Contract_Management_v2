@@ -69,7 +69,7 @@ export interface ContactDetails {
   name: string;
   email: string;
   phoneNumber: string;
-  isPrimary? : boolean;
+  isPrimary?: boolean;
 }
 
 export interface Buyer {
@@ -87,7 +87,12 @@ export interface Buyer {
   updatedAt?: string;
 }
 
-export type ContractStatus = "Draft" | "Incomplete" | "Complete" | "Invoiced";
+export type ContractStatus =
+  | "Draft"
+  | "Incomplete"
+  | "Complete"
+  | "Invoiced"
+  | "Menually-Invoiced";
 
 // For the array of contracts
 
@@ -291,7 +296,7 @@ export interface SellersPaginatedResponse {
 
 export interface XeroConnectionStatus {
   connected: boolean;
-  tenantName: string ;
+  tenantName: string;
   connectedAt: string;
 }
 
@@ -346,7 +351,7 @@ export interface CreateInvoiceResponse {
     invoiceNumber: string;
     xeroUrl: string;
     invoice: XeroInvoice;
-    isUpdate : boolean;
+    isUpdate: boolean;
   };
 }
 

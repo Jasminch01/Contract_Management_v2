@@ -74,7 +74,12 @@ const EditableContract: React.FC<ContractProps> = ({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [startDate, endDate] = dateRange;
-  const statusOptions: ContractStatus[] = ["Incomplete", "Complete", "Draft"];
+  const statusOptions: ContractStatus[] = [
+    "Incomplete",
+    "Complete",
+    "Draft",
+    "Menually-Invoiced",
+  ];
 
   // Cloudinary upload function
   const uploadToCloudinary = async (file: File): Promise<string> => {
