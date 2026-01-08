@@ -75,10 +75,10 @@ export const updateContract = async (
   updatedContract: TUpdateContract,
   id: string
 ): Promise<TContract> => {
-  // Replace 'any' with your actual contract response type
+
   try {
     const response = await instance.put(`/contracts/${id}`, updatedContract);
-    return response.data; // Return the actual data, not the full axios response
+    return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error("Axios error update contract:", error.message);
@@ -102,26 +102,6 @@ export const moveContractToTrash = async (
   } catch (error) {
     console.error("Move to trash error:", error);
 
-    throw error;
-  }
-};
-
-interface SendContractEmailRequest {
-  [key: string]: unknown;
-}
-
-interface SendContractEmailResponse {
-  success: boolean;
-  message: string;
-}
-
-export const sendContractEmail = async (
-  formData: SendContractEmailRequest
-): Promise<SendContractEmailResponse> => {
-  try {
-    const response = await instance.post("send-contract-email", formData);
-    return response.data;
-  } catch (error) {
     throw error;
   }
 };

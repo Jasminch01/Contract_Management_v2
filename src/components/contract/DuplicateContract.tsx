@@ -480,6 +480,7 @@ const EditableContract: React.FC<ContractProps> = ({
   const handleSave = () => {
     const contractToSave = {
       ...contract,
+      status: "Incomplete" as ContractStatus,
       buyer:
         typeof contract.buyer === "string"
           ? contract.buyer
