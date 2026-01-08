@@ -3,12 +3,16 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import DataTable from "react-data-table-component";
-import { Toaster } from "react-hot-toast";
-import { useQuery } from "@tanstack/react-query";
+import toast, { Toaster } from "react-hot-toast";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { IoWarning } from "react-icons/io5";
 import { RiCircleFill } from "react-icons/ri";
-import { MdFileDownload } from "react-icons/md";
-import { fetchContracts } from "@/api/ContractAPi";
+import { MdDelete, MdFileDownload } from "react-icons/md";
+import { fetchContracts, updateContract } from "@/api/ContractAPi";
 import { TContract, ContractsPaginatedResponse } from "@/types/types";
 import InvoiceSearchFilter from "@/components/contract/InvoiceSearchFilter";
 
@@ -130,7 +134,7 @@ const customStyles = {
   },
 };
 
-const ContractManagementPage = () => {
+const InvoicingPage = () => {
   const router = useRouter();
 
   // State management
@@ -148,6 +152,114 @@ const ContractManagementPage = () => {
     sortBy: "contractDate",
     sortOrder: "desc",
   });
+  const queryClient = useQueryClient();
+
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (contracts: TContract[]) => {
+      const updatePromises = contracts.map((contract) =>
+        updateContract(
+          {
+            status: "Complete",
+            xeroInvoiceId: "",
+            xeroInvoiceNumber: "",
+          } as any,
+          contract._id as string
+        )
+      );
+      return Promise.all(updatePromises);
+    },
+
+    onMutate: async (contracts) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["contracts", "invoiced"] });
+
+      // Snapshot previous value
+      const previousContracts = queryClient.getQueryData([
+        "contracts",
+        "invoiced",
+        paginationState,
+      ]);
+
+      // Optimistically remove from invoiced list (since status changes to Complete)
+      queryClient.setQueryData(
+        ["contracts", "invoiced", paginationState],
+        (old: any) => {
+          if (!old?.data) return old;
+
+          const contractIds = contracts.map((c) => c._id);
+
+          return {
+            ...old,
+            data: old.data.filter(
+              (contract: TContract) => !contractIds.includes(contract._id)
+            ),
+            pagination: old.pagination
+              ? {
+                  ...old.pagination,
+                  totalCount: old.pagination.totalCount - contracts.length,
+                }
+              : undefined,
+          };
+        }
+      );
+
+      // Clear selection immediately
+      setSelectedRows([]);
+      setToggleCleared((prev) => !prev);
+
+      toast.success(
+        `Removing ${contracts.length} contract${
+          contracts.length > 1 ? "s" : ""
+        } from invoiced...`
+      );
+
+      return { previousContracts };
+    },
+
+    onSuccess: (_, contracts) => {
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      toast.success(
+        `${contracts.length} contract${
+          contracts.length > 1 ? "s" : ""
+        } marked as Complete and removed from invoiced list`
+      );
+    },
+
+    onError: (error: any, _, context) => {
+      // Rollback on error
+      if (context?.previousContracts) {
+        queryClient.setQueryData(
+          ["contracts", "invoiced", paginationState],
+          context.previousContracts
+        );
+      }
+
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to update contracts";
+      toast.error(errorMessage);
+    },
+  });
+
+  // Delete handler
+  const handleDelete = () => {
+    if (selectedRows.length === 0) {
+      toast.error("Please select at least one contract to remove");
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to mark ${selectedRows.length} contract${
+        selectedRows.length > 1 ? "s" : ""
+      } as Complete and remove from invoiced list? This will clear Xero invoice data.`
+    );
+
+    if (confirmDelete) {
+      deleteMutation.mutate(selectedRows);
+    }
+  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -428,6 +540,18 @@ const ContractManagementPage = () => {
                 ? `Selected (${selectedRows.length})`
                 : "All"}
             </button>
+            <button
+              onClick={handleDelete}
+              disabled={selectedRows.length === 0 || deleteMutation.isPending}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+            >
+              <MdDelete className="text-xl" />
+              {deleteMutation.isPending
+                ? "Deleting..."
+                : `Delete${
+                    selectedRows.length > 0 ? ` (${selectedRows.length})` : ""
+                  }`}
+            </button>
           </div>
           {/* Invoice Search Filter */}
           <div className="w-full xl:w-[30rem] md:w-64 lg:w-80 relative">
@@ -492,4 +616,4 @@ const ContractManagementPage = () => {
   );
 };
 
-export default ContractManagementPage;
+export default InvoicingPage;

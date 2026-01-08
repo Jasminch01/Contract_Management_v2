@@ -7,7 +7,7 @@ import DataTable from "react-data-table-component";
 import toast, { Toaster } from "react-hot-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { HiOutlineDocumentDuplicate } from "react-icons/hi";
-import { IoIosPersonAdd, IoIosSend } from "react-icons/io";
+import { IoIosCloseCircle, IoIosPersonAdd, IoIosSend } from "react-icons/io";
 import { IoFilterSharp, IoWarning } from "react-icons/io5";
 import { MdOutlineEdit } from "react-icons/md";
 import { RiCircleFill, RiDeleteBin6Fill } from "react-icons/ri";
@@ -17,7 +17,7 @@ import AdvanceSearchFilter from "@/components/contract/AdvanceSearchFilter";
 import {
   fetchContracts,
   moveContractToTrash,
-  sendContractEmail,
+  updateContract,
 } from "@/api/ContractAPi";
 import {
   TContract,
@@ -33,6 +33,7 @@ import {
   getXeroConnectionStatus,
 } from "@/api/xeroApi";
 import { GiPaperClip } from "react-icons/gi";
+import { getOutlookConnectionStatus, initiateOutlookAuth, sendContractEmail } from "@/api/emailApi";
 
 // Types for pagination parameters
 interface PaginationState {
@@ -56,6 +57,8 @@ const saveFiltersToStorage = (state: PaginationState) => {
   }
 };
 
+// Add these handler functions (around line 470)
+
 const loadFiltersFromStorage = (): Partial<PaginationState> | null => {
   try {
     const stored = localStorage.getItem(FILTER_STORAGE_KEY);
@@ -75,136 +78,6 @@ const clearFiltersFromStorage = () => {
     console.error("Error clearing filters from localStorage:", error);
   }
 };
-
-const columns = [
-  {
-    name: "DATE",
-    selector: (row: TContract) => {
-      if (!row?.createdAt) return "";
-      const date = new Date(row.contractDate || row.createdAt);
-      return date.toLocaleDateString();
-    },
-    sortable: true,
-    sortField: "contractDate",
-  },
-  {
-    name: "CONTRACT NUMBER",
-    selector: (row: TContract) => row?.contractNumber || "",
-    sortable: true,
-    sortField: "contractNumber",
-  },
-  {
-    name: "SEASON",
-    selector: (row: TContract) => row?.season || "",
-    sortable: true,
-    sortField: "season",
-  },
-  {
-    name: "NGR",
-    selector: (row: TContract) => row?.ngrNumber || row?.seller?.mainNgr || "",
-    sortable: true,
-    sortField: "ngrNumber",
-  },
-  {
-    name: "SELLER",
-    selector: (row: TContract) => row?.seller?.legalName || "",
-    sortable: true,
-    sortField: "seller.legalName",
-  },
-  {
-    name: "SELLER ATTACHMENT",
-    cell: (row: TContract) =>
-      row?.attachedSellerContract ? (
-        <a
-          href={row.attachedSellerContract}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-blue-600 hover:underline"
-        >
-          <GiPaperClip size={16} /> View
-        </a>
-      ) : (
-        <span className="text-gray-400">N/A</span>
-      ),
-    sortable: true,
-    sortField: "seller.legalName",
-  },
-  {
-    name: "GRADE",
-    selector: (row: TContract) => row?.grade || "",
-    sortable: true,
-    sortField: "grade",
-  },
-  {
-    name: "TONNES",
-    selector: (row: TContract) => row?.tonnes || "",
-    sortable: true,
-    sortField: "tonnes",
-  },
-  {
-    name: "BUYER",
-    selector: (row: TContract) => row?.buyer?.name || "",
-    sortable: true,
-    sortField: "buyer.name",
-  },
-  {
-    name: "BUYER ATTACHMENT",
-    cell: (row: TContract) =>
-      row?.attachedBuyerContract ? (
-        <a
-          href={row.attachedBuyerContract}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-blue-600 hover:underline"
-        >
-          <GiPaperClip size={16} /> View
-        </a>
-      ) : (
-        <span className="text-gray-400">N/A</span>
-      ),
-    sortable: true,
-    sortField: "seller.legalName",
-  },
-  {
-    name: "DESTINATION",
-    selector: (row: TContract) => row?.deliveryDestination || "",
-    sortable: true,
-    sortField: "deliveryDestination",
-  },
-  {
-    name: "CONTRACT PRICE",
-    selector: (row: TContract) => row?.priceExGST || 0,
-    sortable: true,
-    sortField: "priceExGST",
-  },
-  {
-    name: "STATUS",
-    selector: (row: TContract) => row?.status || "",
-    sortable: true,
-    sortField: "status",
-    cell: (row: TContract) => (
-      <p className={`text-xs flex items-center gap-x-3`}>
-        <RiCircleFill
-          className={`${
-            row.status?.toLowerCase() === "complete"
-              ? "text-[#108A2B]"
-              : row.status?.toLowerCase() === "invoiced" ||
-                row.status?.toLowerCase() === "menually-invoiced"
-              ? "text-[#3B82F6]"
-              : row.status?.toLowerCase() === "draft"
-              ? "text-[#EF4444]"
-              : "text-[#FAD957]"
-          }`}
-        />
-        {row.status || "Unknown"}
-      </p>
-    ),
-  },
-  {
-    name: "NOTES",
-    selector: (row: TContract) => row.notes || "",
-  },
-];
 
 const customStyles = {
   rows: {
@@ -263,6 +136,298 @@ const ContractManagementPage = () => {
     "buyer" | "seller"
   >("buyer");
   const [emailAdditionalText, setEmailAdditionalText] = useState("");
+
+  const [editingStatusRowId, setEditingStatusRowId] = useState<string | null>(
+    null
+  );
+  const [tempStatus, setTempStatus] = useState<string>("");
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({
+      contractId,
+      newStatus,
+    }: {
+      contractId: string;
+      newStatus: string;
+    }) => {
+      const statusUpdate = {
+        status: newStatus,
+      };
+
+      const response = await updateContract(statusUpdate as any, contractId);
+      return { contractId, newStatus, response };
+    },
+
+    // ✅ Optimistic update - runs immediately before API call
+    onMutate: async ({ contractId, newStatus }) => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ["contracts"] });
+
+      // Snapshot the previous value
+      const previousContracts = queryClient.getQueryData(["contracts"]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(["contracts"], (old: any) => {
+        if (!old) return old;
+
+        // Handle different data structures (array or paginated)
+        if (Array.isArray(old)) {
+          return old.map((contract) =>
+            contract.id === contractId
+              ? { ...contract, status: newStatus }
+              : contract
+          );
+        }
+
+        // If paginated data structure
+        if (old.data && Array.isArray(old.data)) {
+          return {
+            ...old,
+            data: old.data.map((contract: any) =>
+              contract.id === contractId
+                ? { ...contract, status: newStatus }
+                : contract
+            ),
+          };
+        }
+
+        return old;
+      });
+
+      setEditingStatusRowId(null);
+      setTempStatus("");
+
+      // Show immediate feedback
+      toast.success(`Status updated to "${newStatus}"`);
+
+      // Return context with the snapshot
+      return { previousContracts };
+    },
+
+    onSuccess: () => {
+      // Refetch to ensure data is in sync with server
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+    },
+
+    // ✅ Rollback on error
+    onError: (error: any, variables, context) => {
+      // Restore previous data if mutation fails
+      if (context?.previousContracts) {
+        queryClient.setQueryData(["contracts"], context.previousContracts);
+      }
+
+      setEditingStatusRowId(null);
+      setTempStatus("");
+
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to update status. Please try again.";
+
+      toast.error(errorMessage);
+    },
+  });
+
+  const handleStatusClick = (
+    contractId: string,
+    currentStatus: string,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation(); // Prevent row click
+    setEditingStatusRowId(contractId);
+    setTempStatus(currentStatus);
+  };
+
+  const handleStatusSave = (contractId: string) => {
+    if (tempStatus && tempStatus !== "") {
+      updateStatusMutation.mutate({ contractId, newStatus: tempStatus });
+    }
+  };
+
+  const handleStatusCancel = () => {
+    setEditingStatusRowId(null);
+    setTempStatus("");
+  };
+
+  const columns = [
+    {
+      name: "DATE",
+      selector: (row: TContract) => {
+        if (!row?.createdAt) return "";
+        const date = new Date(row.contractDate || row.createdAt);
+        return date.toLocaleDateString();
+      },
+      sortable: true,
+      sortField: "contractDate",
+    },
+    {
+      name: "CONTRACT NUMBER",
+      selector: (row: TContract) => row?.contractNumber || "",
+      sortable: true,
+      sortField: "contractNumber",
+    },
+    {
+      name: "SEASON",
+      selector: (row: TContract) => row?.season || "",
+      sortable: true,
+      sortField: "season",
+    },
+    {
+      name: "NGR",
+      selector: (row: TContract) =>
+        row?.ngrNumber || row?.seller?.mainNgr || "",
+      sortable: true,
+      sortField: "ngrNumber",
+    },
+    {
+      name: "SELLER",
+      selector: (row: TContract) => row?.seller?.legalName || "",
+      sortable: true,
+      width: "200px",
+      sortField: "seller.legalName",
+    },
+    {
+      name: "SELLER ATTACHMENT",
+      cell: (row: TContract) =>
+        row?.attachedSellerContract ? (
+          <a
+            href={row.attachedSellerContract}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-blue-600 hover:underline"
+          >
+            <GiPaperClip size={16} /> View
+          </a>
+        ) : (
+          <span className="text-gray-400">N/A</span>
+        ),
+      sortable: true,
+      sortField: "seller.legalName",
+    },
+    {
+      name: "GRADE",
+      selector: (row: TContract) => row?.grade || "",
+      sortable: true,
+      sortField: "grade",
+    },
+    {
+      name: "TONNES",
+      selector: (row: TContract) => row?.tonnes || "",
+      sortable: true,
+      sortField: "tonnes",
+    },
+    {
+      name: "BUYER",
+      selector: (row: TContract) => row?.buyer?.name || "",
+      sortable: true,
+      width: "200px",
+      sortField: "buyer.name",
+    },
+    {
+      name: "BUYER ATTACHMENT",
+      cell: (row: TContract) =>
+        row?.attachedBuyerContract ? (
+          <a
+            href={row.attachedBuyerContract}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-blue-600 hover:underline"
+          >
+            <GiPaperClip size={16} /> View
+          </a>
+        ) : (
+          <span className="text-gray-400">N/A</span>
+        ),
+      sortable: true,
+      sortField: "seller.legalName",
+    },
+    {
+      name: "DESTINATION",
+      selector: (row: TContract) => row?.deliveryDestination || "",
+      width: "200px",
+      sortField: "deliveryDestination",
+    },
+    {
+      name: "CONTRACT PRICE",
+      selector: (row: TContract) => row?.priceExGST || 0,
+      sortable: true,
+      sortField: "priceExGST",
+    },
+    {
+      name: "STATUS",
+      selector: (row: TContract) => row?.status || "",
+      sortable: true,
+      sortField: "status",
+      width: "220px",
+      cell: (row: TContract) => {
+        const isEditing = editingStatusRowId === row._id;
+
+        return isEditing ? (
+          <div
+            className="flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <select
+              value={tempStatus}
+              onChange={(e) => setTempStatus(e.target.value)} // ✅ FIX: Change this line
+              className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+            >
+              <option value="">Select status</option>
+              {statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => handleStatusSave(row._id!)}
+              disabled={updateStatusMutation.isPending}
+              className="p-1 cursor-pointer text-green-600 hover:bg-green-50 rounded"
+              title="Save"
+            >
+              <MdCheckCircle size={18} />
+            </button>
+            <button
+              onClick={handleStatusCancel}
+              disabled={updateStatusMutation.isPending}
+              className="p-1 text-red-600 cursor-pointer hover:bg-red-50 rounded"
+              title="Cancel"
+            >
+              <IoIosCloseCircle size={18} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={(e) => handleStatusClick(row._id!, row.status || "", e)}
+            className="text-xs flex items-center gap-x-3 hover:bg-gray-100 px-3 py-1 rounded transition-colors w-full"
+          >
+            <RiCircleFill
+              className={`${
+                row.status?.toLowerCase() === "complete"
+                  ? "text-[#108A2B]"
+                  : row.status?.toLowerCase() === "invoiced" ||
+                    row.status?.toLowerCase() === "menually-invoiced"
+                  ? "text-[#3B82F6]"
+                  : row.status?.toLowerCase() === "draft"
+                  ? "text-[#EF4444]"
+                  : "text-[#FAD957]"
+              }`}
+            />
+            <span>{row.status || "Unknown"}</span>
+            <MdOutlineEdit
+              size={14}
+              className="ml-auto text-gray-400 cursor-pointer"
+            />
+          </button>
+        );
+      },
+    },
+    {
+      name: "NOTES",
+      selector: (row: TContract) => row.notes || "",
+    },
+  ];
 
   // Initialize pagination state with stored filters
   const getInitialPaginationState = (): PaginationState => {
@@ -607,8 +772,6 @@ const ContractManagementPage = () => {
           // Verify connection after authorization
           const newStatus = await getXeroConnectionStatus();
 
-          console.log("New Xero Status:", newStatus);
-
           setXeroStatus({
             isConnected: newStatus.connected,
             tenantName: newStatus.tenantName || null,
@@ -644,6 +807,14 @@ const ContractManagementPage = () => {
       defaultDueDate.setDate(defaultDueDate.getDate() + 30);
 
       const firstContract = selectedRows[0];
+
+      // ✅ Use contract date as invoice date
+      const contractDate =
+        firstContract.contractDate || firstContract.createdAt;
+      const invoiceDate = contractDate
+        ? new Date(contractDate).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0];
+
       const reference =
         selectedRows.length === 1
           ? `${firstContract.contractNumber} - ${firstContract.seller?.legalName}`
@@ -655,7 +826,7 @@ const ContractManagementPage = () => {
         .join("\n---\n");
 
       setInvoiceFormData({
-        invoiceDate: new Date().toISOString().split("T")[0],
+        invoiceDate: invoiceDate, // ✅ Set to contract date
         dueDate: defaultDueDate.toISOString().split("T")[0],
         reference: reference,
         notes: combinedNotes || "",
@@ -717,9 +888,6 @@ const ContractManagementPage = () => {
     const contractGroups = groupContractsByInvoiceRecipient(selectedRows);
     const groupKeys = Object.keys(contractGroups);
 
-    console.log("Contract Groups:", contractGroups);
-    console.log("Number of invoices to create:", groupKeys.length);
-
     if (groupKeys.length === 1) {
       // Single invoice for all contracts (same recipient)
       const contracts = contractGroups[groupKeys[0]];
@@ -735,10 +903,6 @@ const ContractManagementPage = () => {
         recipientType === "seller"
           ? firstContract.seller?.legalName
           : firstContract.buyer?.name;
-
-      console.log(
-        `Creating single invoice for ${contracts.length} contracts - ${recipientName}`
-      );
 
       createInvoiceMutation.mutate({
         contractIds: contracts.map((c) => c._id!),
@@ -775,10 +939,6 @@ const ContractManagementPage = () => {
             contracts.length === 1
               ? `${contracts[0].contractNumber} - ${recipientName}`
               : `Brokerage Invoice - ${recipientName} (${contracts.length} contracts)`;
-
-          console.log(
-            `Creating invoice for ${contracts.length} contracts - ${recipientName}`
-          );
 
           return createXeroInvoice({
             contractIds: contracts.map((c) => c._id!),
@@ -1094,13 +1254,162 @@ const ContractManagementPage = () => {
     }
   };
 
-  const handleEmail = (recipientType: "buyer" | "seller") => {
-    if (selectedRows.length === 0) {
-      toast.error(
-        `Please select at least one contract to email ${recipientType}`
-      );
+  // const handleEmail = (recipientType: "buyer" | "seller") => {
+  //   if (selectedRows.length === 0) {
+  //     toast.error(
+  //       `Please select at least one contract to email ${recipientType}`
+  //     );
+  //     return;
+  //   }
+
+  //   const validRows = selectedRows.filter(
+  //     (row): row is TContract => row != null
+  //   );
+
+  //   const recipients = validRows
+  //     .map((row) =>
+  //       recipientType === "buyer" ? row.buyer?.email : row.seller?.email
+  //     )
+  //     .filter((email): email is string => Boolean(email));
+
+  //   if (recipients.length === 0) {
+  //     toast.error(
+  //       `No valid ${recipientType} emails found in selected contracts`
+  //     );
+  //     return;
+  //   }
+
+  //   // Set recipient type and open modal
+  //   setEmailRecipientType(recipientType);
+  //   setEmailAdditionalText("");
+  //   setIsEmailModalOpen(true);
+  // };
+
+  // const confirmSendEmail = async () => {
+  //   try {
+  //     toast.loading("Generating PDF and sending email...");
+
+  //     const validRows = selectedRows.filter(
+  //       (row): row is TContract => row != null
+  //     );
+
+  //     const recipients = validRows
+  //       .map((row) =>
+  //         emailRecipientType === "buyer" ? row.buyer?.email : row.seller?.email
+  //       )
+  //       .filter((email): email is string => Boolean(email));
+
+  //     const pdfBlob = await generatePDFBlobFromComponent(validRows);
+
+  //     if (!pdfBlob) {
+  //       toast.dismiss();
+  //       throw new Error("Failed to generate PDF");
+  //     }
+
+  //     // Convert blob to FormData
+  //     const formData = new FormData();
+  //     formData.append(
+  //       "pdf",
+  //       pdfBlob,
+  //       `contracts_${emailRecipientType}_${Date.now()}.pdf`
+  //     );
+  //     formData.append("recipients", JSON.stringify(recipients));
+  //     formData.append("recipientType", emailRecipientType);
+  //     formData.append("contracts", JSON.stringify(validRows));
+  //     formData.append("additionalText", emailAdditionalText);
+
+  //     // Send to backend
+  //     const response = await sendContractEmail(formData as any);
+  //     toast.dismiss();
+
+  //     if (response.success) {
+  //       toast.success(
+  //         `Email sent successfully to ${recipients.length} ${emailRecipientType}(s)!`,
+  //         { duration: 3000 }
+  //       );
+
+  //       // Close modal and reset form
+  //       setIsEmailModalOpen(false);
+  //       setEmailAdditionalText("");
+  //     } else {
+  //       throw new Error("Failed to send email");
+  //     }
+  //   } catch (error: any) {
+  //     toast.dismiss();
+  //     console.error("Error sending email:", error);
+
+  //     const errorMessage =
+  //       error.response?.data?.error ||
+  //       error.message ||
+  //       "Failed to send email. Please try again.";
+
+  //     toast.error(errorMessage, { duration: 3000 });
+  //   }
+  // };
+
+// Updated email handler functions
+
+const handleEmail = async (recipientType: "buyer" | "seller") => {
+  if (selectedRows.length === 0) {
+    toast.error(
+      `Please select at least one contract to email ${recipientType}`
+    );
+    return;
+  }
+
+  const validRows = selectedRows.filter(
+    (row): row is TContract => row != null
+  );
+
+  const recipients = validRows
+    .map((row) =>
+      recipientType === "buyer" ? row.buyer?.email : row.seller?.email
+    )
+    .filter((email): email is string => Boolean(email));
+
+  if (recipients.length === 0) {
+    toast.error(
+      `No valid ${recipientType} emails found in selected contracts`
+    );
+    return;
+  }
+
+  try {
+    // Check Outlook connection
+    const status = await getOutlookConnectionStatus();
+
+    if (!status) {
+      toast.loading("Opening Outlook authorization...");
+
+      try {
+        await initiateOutlookAuth();
+        toast.dismiss();
+        toast.success("Outlook connected successfully!");
+        
+        // Retry opening email modal after connection
+        setEmailRecipientType(recipientType);
+        setEmailAdditionalText("");
+        setIsEmailModalOpen(true);
+      } catch (authError: any) {
+        toast.dismiss();
+        toast.error(authError.message || "Failed to authorize Outlook");
+      }
       return;
     }
+
+    // Already connected - open email modal
+    setEmailRecipientType(recipientType);
+    setEmailAdditionalText("");
+    setIsEmailModalOpen(true);
+  } catch (error: any) {
+    toast.dismiss();
+    toast.error(error.message || "Failed to verify Outlook connection");
+  }
+};
+
+const confirmSendEmail = async () => {
+  try {
+    toast.loading("Generating PDF and sending email...");
 
     const validRows = selectedRows.filter(
       (row): row is TContract => row != null
@@ -1108,84 +1417,49 @@ const ContractManagementPage = () => {
 
     const recipients = validRows
       .map((row) =>
-        recipientType === "buyer" ? row.buyer?.email : row.seller?.email
+        emailRecipientType === "buyer" ? row.buyer?.email : row.seller?.email
       )
       .filter((email): email is string => Boolean(email));
 
     if (recipients.length === 0) {
-      toast.error(
-        `No valid ${recipientType} emails found in selected contracts`
-      );
+      toast.dismiss();
+      toast.error("No valid email addresses found");
       return;
     }
 
-    // Set recipient type and open modal
-    setEmailRecipientType(recipientType);
-    setEmailAdditionalText("");
-    setIsEmailModalOpen(true);
-  };
+    const pdfBlob = await generatePDFBlobFromComponent(validRows);
 
-  const confirmSendEmail = async () => {
-    try {
-      toast.loading("Generating PDF and sending email...");
-
-      const validRows = selectedRows.filter(
-        (row): row is TContract => row != null
-      );
-
-      const recipients = validRows
-        .map((row) =>
-          emailRecipientType === "buyer" ? row.buyer?.email : row.seller?.email
-        )
-        .filter((email): email is string => Boolean(email));
-
-      const pdfBlob = await generatePDFBlobFromComponent(validRows);
-
-      if (!pdfBlob) {
-        toast.dismiss();
-        throw new Error("Failed to generate PDF");
-      }
-
-      // Convert blob to FormData
-      const formData = new FormData();
-      formData.append(
-        "pdf",
-        pdfBlob,
-        `contracts_${emailRecipientType}_${Date.now()}.pdf`
-      );
-      formData.append("recipients", JSON.stringify(recipients));
-      formData.append("recipientType", emailRecipientType);
-      formData.append("contracts", JSON.stringify(validRows));
-      formData.append("additionalText", emailAdditionalText);
-
-      // Send to backend
-      const response = await sendContractEmail(formData as any);
+    if (!pdfBlob) {
       toast.dismiss();
-
-      if (response.success) {
-        toast.success(
-          `Email sent successfully to ${recipients.length} ${emailRecipientType}(s)!`,
-          { duration: 3000 }
-        );
-
-        // Close modal and reset form
-        setIsEmailModalOpen(false);
-        setEmailAdditionalText("");
-      } else {
-        throw new Error("Failed to send email");
-      }
-    } catch (error: any) {
-      toast.dismiss();
-      console.error("Error sending email:", error);
-
-      const errorMessage =
-        error.response?.data?.error ||
-        error.message ||
-        "Failed to send email. Please try again.";
-
-      toast.error(errorMessage, { duration: 3000 });
+      throw new Error("Failed to generate PDF");
     }
-  };
+
+    const response = await sendContractEmail({
+      recipients,
+      recipientType: emailRecipientType,
+      contracts: validRows,
+      additionalText: emailAdditionalText,
+      pdf: pdfBlob,
+    });
+
+    toast.dismiss();
+
+    if (!response.success) {
+      throw new Error(response.message);
+    }
+
+    toast.success(
+      `Email sent successfully to ${recipients.length} ${emailRecipientType}(s)!`
+    );
+
+    setIsEmailModalOpen(false);
+    setEmailAdditionalText("");
+  } catch (error: any) {
+    toast.dismiss();
+    toast.error(error.message || "Failed to send email");
+  }
+};
+
   const generatePDFBlobFromComponent = async (
     contracts: TContract[]
   ): Promise<Blob | null> => {
@@ -1488,7 +1762,7 @@ const ContractManagementPage = () => {
         </div>
 
         {/* DataTable with Server-side Pagination */}
-        <div className="overflow-x-auto border border-gray-300">
+        <div className="border border-gray-300">
           <DataTable
             columns={columns}
             data={contracts}
