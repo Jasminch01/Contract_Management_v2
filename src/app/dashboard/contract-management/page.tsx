@@ -2331,7 +2331,7 @@ const ContractManagementPage = () => {
                     >
                       <span>• {contract.contractNumber}</span>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100">
-                        Current: {contract.status || "Unknown"}
+                        Current: {contract.status.replace("_", " ") || "Unknown"}
                       </span>
                     </div>
                   ))}
