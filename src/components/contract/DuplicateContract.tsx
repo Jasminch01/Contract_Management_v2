@@ -78,7 +78,7 @@ const EditableContract: React.FC<ContractProps> = ({
     "Incomplete",
     "Complete",
     "Draft",
-    "Menually-Invoiced",
+    "Manually-Invoiced",
   ];
 
   // Cloudinary upload function
@@ -480,7 +480,10 @@ const EditableContract: React.FC<ContractProps> = ({
   const handleSave = () => {
     const contractToSave = {
       ...contract,
-      status: "Incomplete" as ContractStatus,
+      status:
+        hasChanges && contract.status !== initialContract.status
+          ? contract.status
+          : ("Incomplete" as ContractStatus),
       buyer:
         typeof contract.buyer === "string"
           ? contract.buyer
@@ -923,7 +926,9 @@ const EditableContract: React.FC<ContractProps> = ({
                     setShowStatusDropdown(!showStatusDropdown);
                   }}
                 >
-                  <span className="capitalize">{contract.status || ""}</span>
+                  <span className="capitalize">
+                    {contract.status?.replace("-", " ") || ""}
+                  </span>
                   <MdArrowDropDown className="text-xl" />
                 </div>
                 {showStatusDropdown && (
@@ -937,7 +942,7 @@ const EditableContract: React.FC<ContractProps> = ({
                           handleStatusSelect(status);
                         }}
                       >
-                        {status}
+                        {status.replace("-", " ")}
                       </div>
                     ))}
                   </div>

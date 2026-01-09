@@ -15,6 +15,7 @@ import ExportCsv from "@/components/contract/ExportCsv";
 import PdfExportButton from "@/components/contract/PdfExportButton";
 import AdvanceSearchFilter from "@/components/contract/AdvanceSearchFilter";
 import {
+  bulkUpdateContractStatus,
   fetchContracts,
   moveContractToTrash,
   updateContract,
@@ -33,7 +34,11 @@ import {
   getXeroConnectionStatus,
 } from "@/api/xeroApi";
 import { GiPaperClip } from "react-icons/gi";
-import { getOutlookConnectionStatus, initiateOutlookAuth, sendContractEmail } from "@/api/emailApi";
+import {
+  getOutlookConnectionStatus,
+  initiateOutlookAuth,
+  sendContractEmail,
+} from "@/api/emailApi";
 
 // Types for pagination parameters
 interface PaginationState {
@@ -110,11 +115,18 @@ const customStyles = {
   },
 };
 
+const updateStatusOptions = [
+  { value: "Complete", label: "Complete" },
+  { value: "Incomplete", label: "Incomplete" },
+  { value: "Manually-Invoiced", label: "Manually Invoiced" },
+  { value: "Draft", label: "Draft" },
+];
+
 const statusOptions = [
   { value: "Complete", label: "Complete" },
   { value: "Incomplete", label: "Incomplete" },
   { value: "Invoiced", label: "Invoiced" },
-  { value: "Menually-Invoiced", label: "Menually-Invoiced" },
+  { value: "Manually-Invoiced", label: "Manually Invoiced" },
   { value: "Draft", label: "Draft" },
 ];
 
@@ -141,6 +153,145 @@ const ContractManagementPage = () => {
     null
   );
   const [tempStatus, setTempStatus] = useState<string>("");
+  const [isBulkStatusModalOpen, setIsBulkStatusModalOpen] = useState(false);
+  const [bulkStatusValue, setBulkStatusValue] = useState<string>("");
+
+  const bulkUpdateStatusMutation = useMutation({
+    mutationFn: async ({
+      contractIds,
+      newStatus,
+    }: {
+      contractIds: string[];
+      newStatus: string;
+    }) => {
+      const response = await bulkUpdateContractStatus(contractIds, newStatus);
+      return response;
+    },
+
+    onMutate: async ({ contractIds, newStatus }) => {
+      await queryClient.cancelQueries({ queryKey: ["contracts"] });
+      const previousContracts = queryClient.getQueryData(["contracts"]);
+
+      // Optimistically update
+      queryClient.setQueryData(["contracts"], (old: any) => {
+        if (!old) return old;
+
+        if (Array.isArray(old)) {
+          return old.map((contract) =>
+            contractIds.includes(contract.id)
+              ? { ...contract, status: newStatus }
+              : contract
+          );
+        }
+
+        if (old.data && Array.isArray(old.data)) {
+          return {
+            ...old,
+            data: old.data.map((contract: any) =>
+              contractIds.includes(contract._id)
+                ? { ...contract, status: newStatus }
+                : contract
+            ),
+          };
+        }
+
+        return old;
+      });
+
+      setIsBulkStatusModalOpen(false);
+      setBulkStatusValue("");
+      setSelectedRows([]);
+      setToggleCleared((prev) => !prev);
+
+      toast.success(`Updating ${contractIds.length} contract(s)...`);
+
+      return { previousContracts };
+    },
+
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      toast.dismiss();
+      toast.success(
+        `Successfully updated ${response.modifiedCount} contract(s) to "${response.contracts[0]?.status}"`,
+        { duration: 4000 }
+      );
+    },
+
+    onError: (error: any, variables, context) => {
+      if (context?.previousContracts) {
+        queryClient.setQueryData(["contracts"], context.previousContracts);
+      }
+
+      toast.dismiss();
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to update contract status";
+
+      toast.error(errorMessage, { duration: 4000 });
+
+      setIsBulkStatusModalOpen(false);
+      setBulkStatusValue("");
+    },
+  });
+
+  const handleBulkStatusUpdate = () => {
+    if (selectedRows.length === 0) {
+      toast.error("Please select at least one contract to update");
+      return;
+    }
+
+    // Check for invoiced contracts
+    const invoicedContracts = selectedRows.filter(
+      (row) =>
+        row.status?.toLowerCase() === "invoiced" ||
+        row.status?.toLowerCase() === "menually-invoiced"
+    );
+
+    if (invoicedContracts.length > 0) {
+      const invoicedNumbers = invoicedContracts
+        .map((c) => c.contractNumber)
+        .join(", ");
+
+      toast.error(
+        <div>
+          <p className="font-semibold">Cannot Update Invoiced Contracts</p>
+          <p className="text-sm mt-1">
+            The following contracts are already invoiced and their status cannot
+            be changed: {invoicedNumbers}
+          </p>
+        </div>,
+        { duration: 6000 }
+      );
+      return;
+    }
+
+    setBulkStatusValue("");
+    setIsBulkStatusModalOpen(true);
+  };
+
+  const confirmBulkStatusUpdate = () => {
+    if (!bulkStatusValue || bulkStatusValue === "") {
+      toast.error("Please select a status");
+      return;
+    }
+
+    const contractIds = selectedRows
+      .filter((row): row is TContract => row != null && row._id != null)
+      .map((row) => row._id!)
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+    if (contractIds.length === 0) {
+      toast.error("No valid contracts selected for update");
+      setIsBulkStatusModalOpen(false);
+      return;
+    }
+
+    bulkUpdateStatusMutation.mutate({
+      contractIds,
+      newStatus: bulkStatusValue,
+    });
+  };
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({
@@ -407,14 +558,14 @@ const ContractManagementPage = () => {
                 row.status?.toLowerCase() === "complete"
                   ? "text-[#108A2B]"
                   : row.status?.toLowerCase() === "invoiced" ||
-                    row.status?.toLowerCase() === "menually-invoiced"
+                    row.status?.toLowerCase() === "manually-invoiced"
                   ? "text-[#3B82F6]"
                   : row.status?.toLowerCase() === "draft"
                   ? "text-[#EF4444]"
                   : "text-[#FAD957]"
               }`}
             />
-            <span>{row.status || "Unknown"}</span>
+            <span>{row.status?.replace("-", " ") || "Unknown"}</span>
             <MdOutlineEdit
               size={14}
               className="ml-auto text-gray-400 cursor-pointer"
@@ -1253,163 +1404,13 @@ const ContractManagementPage = () => {
       toast.error("Selected contract is invalid");
     }
   };
-
-  // const handleEmail = (recipientType: "buyer" | "seller") => {
-  //   if (selectedRows.length === 0) {
-  //     toast.error(
-  //       `Please select at least one contract to email ${recipientType}`
-  //     );
-  //     return;
-  //   }
-
-  //   const validRows = selectedRows.filter(
-  //     (row): row is TContract => row != null
-  //   );
-
-  //   const recipients = validRows
-  //     .map((row) =>
-  //       recipientType === "buyer" ? row.buyer?.email : row.seller?.email
-  //     )
-  //     .filter((email): email is string => Boolean(email));
-
-  //   if (recipients.length === 0) {
-  //     toast.error(
-  //       `No valid ${recipientType} emails found in selected contracts`
-  //     );
-  //     return;
-  //   }
-
-  //   // Set recipient type and open modal
-  //   setEmailRecipientType(recipientType);
-  //   setEmailAdditionalText("");
-  //   setIsEmailModalOpen(true);
-  // };
-
-  // const confirmSendEmail = async () => {
-  //   try {
-  //     toast.loading("Generating PDF and sending email...");
-
-  //     const validRows = selectedRows.filter(
-  //       (row): row is TContract => row != null
-  //     );
-
-  //     const recipients = validRows
-  //       .map((row) =>
-  //         emailRecipientType === "buyer" ? row.buyer?.email : row.seller?.email
-  //       )
-  //       .filter((email): email is string => Boolean(email));
-
-  //     const pdfBlob = await generatePDFBlobFromComponent(validRows);
-
-  //     if (!pdfBlob) {
-  //       toast.dismiss();
-  //       throw new Error("Failed to generate PDF");
-  //     }
-
-  //     // Convert blob to FormData
-  //     const formData = new FormData();
-  //     formData.append(
-  //       "pdf",
-  //       pdfBlob,
-  //       `contracts_${emailRecipientType}_${Date.now()}.pdf`
-  //     );
-  //     formData.append("recipients", JSON.stringify(recipients));
-  //     formData.append("recipientType", emailRecipientType);
-  //     formData.append("contracts", JSON.stringify(validRows));
-  //     formData.append("additionalText", emailAdditionalText);
-
-  //     // Send to backend
-  //     const response = await sendContractEmail(formData as any);
-  //     toast.dismiss();
-
-  //     if (response.success) {
-  //       toast.success(
-  //         `Email sent successfully to ${recipients.length} ${emailRecipientType}(s)!`,
-  //         { duration: 3000 }
-  //       );
-
-  //       // Close modal and reset form
-  //       setIsEmailModalOpen(false);
-  //       setEmailAdditionalText("");
-  //     } else {
-  //       throw new Error("Failed to send email");
-  //     }
-  //   } catch (error: any) {
-  //     toast.dismiss();
-  //     console.error("Error sending email:", error);
-
-  //     const errorMessage =
-  //       error.response?.data?.error ||
-  //       error.message ||
-  //       "Failed to send email. Please try again.";
-
-  //     toast.error(errorMessage, { duration: 3000 });
-  //   }
-  // };
-
-// Updated email handler functions
-
-const handleEmail = async (recipientType: "buyer" | "seller") => {
-  if (selectedRows.length === 0) {
-    toast.error(
-      `Please select at least one contract to email ${recipientType}`
-    );
-    return;
-  }
-
-  const validRows = selectedRows.filter(
-    (row): row is TContract => row != null
-  );
-
-  const recipients = validRows
-    .map((row) =>
-      recipientType === "buyer" ? row.buyer?.email : row.seller?.email
-    )
-    .filter((email): email is string => Boolean(email));
-
-  if (recipients.length === 0) {
-    toast.error(
-      `No valid ${recipientType} emails found in selected contracts`
-    );
-    return;
-  }
-
-  try {
-    // Check Outlook connection
-    const status = await getOutlookConnectionStatus();
-
-    if (!status) {
-      toast.loading("Opening Outlook authorization...");
-
-      try {
-        await initiateOutlookAuth();
-        toast.dismiss();
-        toast.success("Outlook connected successfully!");
-        
-        // Retry opening email modal after connection
-        setEmailRecipientType(recipientType);
-        setEmailAdditionalText("");
-        setIsEmailModalOpen(true);
-      } catch (authError: any) {
-        toast.dismiss();
-        toast.error(authError.message || "Failed to authorize Outlook");
-      }
+  const handleEmail = async (recipientType: "buyer" | "seller") => {
+    if (selectedRows.length === 0) {
+      toast.error(
+        `Please select at least one contract to email ${recipientType}`
+      );
       return;
     }
-
-    // Already connected - open email modal
-    setEmailRecipientType(recipientType);
-    setEmailAdditionalText("");
-    setIsEmailModalOpen(true);
-  } catch (error: any) {
-    toast.dismiss();
-    toast.error(error.message || "Failed to verify Outlook connection");
-  }
-};
-
-const confirmSendEmail = async () => {
-  try {
-    toast.loading("Generating PDF and sending email...");
 
     const validRows = selectedRows.filter(
       (row): row is TContract => row != null
@@ -1417,48 +1418,102 @@ const confirmSendEmail = async () => {
 
     const recipients = validRows
       .map((row) =>
-        emailRecipientType === "buyer" ? row.buyer?.email : row.seller?.email
+        recipientType === "buyer" ? row.buyer?.email : row.seller?.email
       )
       .filter((email): email is string => Boolean(email));
 
     if (recipients.length === 0) {
-      toast.dismiss();
-      toast.error("No valid email addresses found");
+      toast.error(
+        `No valid ${recipientType} emails found in selected contracts`
+      );
       return;
     }
 
-    const pdfBlob = await generatePDFBlobFromComponent(validRows);
+    try {
+      // Check Outlook connection
+      const status = await getOutlookConnectionStatus();
 
-    if (!pdfBlob) {
+      if (!status) {
+        toast.loading("Opening Outlook authorization...");
+
+        try {
+          await initiateOutlookAuth();
+          toast.dismiss();
+          toast.success("Outlook connected successfully!");
+
+          // Retry opening email modal after connection
+          setEmailRecipientType(recipientType);
+          setEmailAdditionalText("");
+          setIsEmailModalOpen(true);
+        } catch (authError: any) {
+          toast.dismiss();
+          toast.error(authError.message || "Failed to authorize Outlook");
+        }
+        return;
+      }
+
+      // Already connected - open email modal
+      setEmailRecipientType(recipientType);
+      setEmailAdditionalText("");
+      setIsEmailModalOpen(true);
+    } catch (error: any) {
       toast.dismiss();
-      throw new Error("Failed to generate PDF");
+      toast.error(error.message || "Failed to verify Outlook connection");
     }
+  };
 
-    const response = await sendContractEmail({
-      recipients,
-      recipientType: emailRecipientType,
-      contracts: validRows,
-      additionalText: emailAdditionalText,
-      pdf: pdfBlob,
-    });
+  const confirmSendEmail = async () => {
+    try {
+      toast.loading("Generating PDF and sending email...");
 
-    toast.dismiss();
+      const validRows = selectedRows.filter(
+        (row): row is TContract => row != null
+      );
 
-    if (!response.success) {
-      throw new Error(response.message);
+      const recipients = validRows
+        .map((row) =>
+          emailRecipientType === "buyer" ? row.buyer?.email : row.seller?.email
+        )
+        .filter((email): email is string => Boolean(email));
+
+      if (recipients.length === 0) {
+        toast.dismiss();
+        toast.error("No valid email addresses found");
+        return;
+      }
+
+      const pdfBlob = await generatePDFBlobFromComponent(validRows);
+
+      if (!pdfBlob) {
+        toast.dismiss();
+        throw new Error("Failed to generate PDF");
+      }
+
+      const response = await sendContractEmail({
+        recipients,
+        recipientType: emailRecipientType,
+        contracts: validRows,
+        additionalText: emailAdditionalText,
+        pdf: pdfBlob,
+      });
+
+      toast.dismiss();
+
+      if (!response.success) {
+        throw new Error(response.message);
+      }
+
+      toast.success(
+        `Email sent successfully to ${recipients.length} ${emailRecipientType}(s)!`
+      );
+
+      setIsEmailModalOpen(false);
+      setEmailAdditionalText("");
+    } catch (error: any) {
+      toast.dismiss();
+      toast.error(error.message || "Failed to send email");
     }
-
-    toast.success(
-      `Email sent successfully to ${recipients.length} ${emailRecipientType}(s)!`
-    );
-
-    setIsEmailModalOpen(false);
-    setEmailAdditionalText("");
-  } catch (error: any) {
-    toast.dismiss();
-    toast.error(error.message || "Failed to send email");
-  }
-};
+  };
 
   const generatePDFBlobFromComponent = async (
     contracts: TContract[]
@@ -1480,7 +1535,6 @@ const confirmSendEmail = async () => {
     }
   };
 
-  // Prevent hydration mismatch
   if (!isMounted) {
     return (
       <div className="mt-20 flex justify-center items-center min-h-64">
@@ -1615,7 +1669,18 @@ const confirmSendEmail = async () => {
                 </>
               )}
             </button>
-
+            <button
+              onClick={handleBulkStatusUpdate}
+              disabled={selectedRows.length === 0}
+              className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${
+                selectedRows.length > 0
+                  ? "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 cursor-pointer"
+                  : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
+              }`}
+            >
+              <MdOutlineEdit />
+              Update Status
+            </button>
             <button
               onClick={handleDuplicate}
               className={`w-full md:w-auto px-3 py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${
@@ -2236,6 +2301,107 @@ const confirmSendEmail = async () => {
               >
                 <IoIosSend />
                 Send Email
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isBulkStatusModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-xl font-semibold flex gap-x-3 items-center">
+                <MdOutlineEdit className="text-purple-600 text-2xl" />
+                Update Contract Status
+              </h3>
+            </div>
+
+            <div className="px-6 py-4">
+              {/* Selected Contracts Info */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                <h4 className="font-semibold text-gray-800 mb-2">
+                  Selected Contracts ({selectedRows.length})
+                </h4>
+                <div className="space-y-1 text-sm max-h-40 overflow-y-auto">
+                  {selectedRows.map((contract, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between text-gray-700"
+                    >
+                      <span>• {contract.contractNumber}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100">
+                        Current: {contract.status || "Unknown"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status Selection */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    New Status *
+                  </label>
+                  <select
+                    value={bulkStatusValue}
+                    onChange={(e) => setBulkStatusValue(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    autoFocus
+                  >
+                    <option value="">Select new status</option>
+                    {updateStatusOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Warning Message */}
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <IoWarning className="text-yellow-600 text-lg flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-yellow-800">
+                      This will update the status of all {selectedRows.length}{" "}
+                      selected contract(s). This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setIsBulkStatusModalOpen(false);
+                  setBulkStatusValue("");
+                }}
+                disabled={bulkUpdateStatusMutation.isPending}
+                className="px-5 py-2 border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmBulkStatusUpdate}
+                disabled={
+                  bulkUpdateStatusMutation.isPending || !bulkStatusValue
+                }
+                className="px-5 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+              >
+                {bulkUpdateStatusMutation.isPending ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <MdCheckCircle />
+                    Update Status
+                  </>
+                )}
               </button>
             </div>
           </div>
