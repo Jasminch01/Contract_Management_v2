@@ -75,7 +75,6 @@ export const updateContract = async (
   updatedContract: TUpdateContract,
   id: string
 ): Promise<TContract> => {
-
   try {
     const response = await instance.put(`/contracts/${id}`, updatedContract);
     return response.data;
@@ -87,6 +86,34 @@ export const updateContract = async (
     }
     // Throw the error so React Query can handle it properly
     throw error;
+  }
+};
+
+// Bulk update contract status
+export const bulkUpdateContractStatus = async (
+  contractIds: string[],
+  status: string
+): Promise<{
+  message: string;
+  modifiedCount: number;
+  contracts: TContract[];
+}> => {
+  try {
+    const response = await instance.put("/contracts/bulk-update-status", {
+      contractIds,
+      status,
+    });
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error("Axios error bulk update status:", error.message);
+      throw new Error(
+        error.response?.data?.message || "Failed to update contract status"
+      );
+    } else {
+      console.error("Unexpected error bulk update status:", error);
+      throw error;
+    }
   }
 };
 
