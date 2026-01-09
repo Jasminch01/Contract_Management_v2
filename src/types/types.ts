@@ -92,7 +92,7 @@ export type ContractStatus =
   | "Incomplete"
   | "Complete"
   | "Invoiced"
-  | "Menually-Invoiced";
+  | "Manually-Invoiced";
 
 // For the array of contracts
 
