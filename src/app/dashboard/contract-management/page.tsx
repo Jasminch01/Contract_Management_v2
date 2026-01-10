@@ -1431,9 +1431,9 @@ const ContractManagementPage = () => {
 
     try {
       // Check Outlook connection
-      const status = await getOutlookConnectionStatus();
+      const {connected}= await getOutlookConnectionStatus();
 
-      if (!status) {
+      if (!connected) {
         toast.loading("Opening Outlook authorization...");
 
         try {
