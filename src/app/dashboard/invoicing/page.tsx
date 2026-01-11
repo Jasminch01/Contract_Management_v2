@@ -597,6 +597,7 @@ const InvoicingPage = () => {
             </div>
           }
           pagination
+          paginationServer
           paginationPerPage={paginationState.limit}
           paginationRowsPerPageOptions={[10, 25, 50, 100]}
           onChangeRowsPerPage={handlePerRowsChange}
