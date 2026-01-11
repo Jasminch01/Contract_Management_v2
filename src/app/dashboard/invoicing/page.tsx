@@ -119,7 +119,6 @@ const customStyles = {
   cells: {
     style: {
       borderRight: "1px solid #ddd",
-      // padding: "12px",
     },
   },
   headCells: {
@@ -171,17 +170,14 @@ const InvoicingPage = () => {
     },
 
     onMutate: async (contracts) => {
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ["contracts", "invoiced"] });
 
-      // Snapshot previous value
       const previousContracts = queryClient.getQueryData([
         "contracts",
         "invoiced",
         paginationState,
       ]);
 
-      // Optimistically remove from invoiced list (since status changes to Complete)
       queryClient.setQueryData(
         ["contracts", "invoiced", paginationState],
         (old: any) => {
@@ -204,7 +200,6 @@ const InvoicingPage = () => {
         }
       );
 
-      // Clear selection immediately
       setSelectedRows([]);
       setToggleCleared((prev) => !prev);
 
@@ -227,7 +222,6 @@ const InvoicingPage = () => {
     },
 
     onError: (error: any, _, context) => {
-      // Rollback on error
       if (context?.previousContracts) {
         queryClient.setQueryData(
           ["contracts", "invoiced", paginationState],
@@ -296,7 +290,6 @@ const InvoicingPage = () => {
     paginationState.dateTo
   ) {
     contracts = contracts.filter((contract) => {
-      // Apply search filters
       const searchMatch = Object.entries(paginationState.searchFilters).every(
         ([key, value]) => {
           if (!value) return true;
@@ -325,7 +318,6 @@ const InvoicingPage = () => {
         }
       );
 
-      // Apply date filters
       const contractDate = new Date(
         contract.contractDate || contract.createdAt
       );
@@ -375,32 +367,11 @@ const InvoicingPage = () => {
     );
   };
 
-  // Handle pagination
-  const handlePageChange = (page: number) => {
-    setPaginationState((prev) => ({ ...prev, page }));
-    setSelectedRows([]);
-    setToggleCleared((prev) => !prev);
-  };
+  // Handle pagination - REMOVED because we're using client-side pagination
+  // The DataTable component will handle pagination internally
 
-  const handlePerRowsChange = (newPerPage: number) => {
-    setPaginationState((prev) => ({
-      ...prev,
-      limit: newPerPage,
-      page: 1,
-    }));
-    setSelectedRows([]);
-    setToggleCleared((prev) => !prev);
-  };
-
-  // Handle sorting
-  const handleSort = (column: any, sortDirection: "asc" | "desc") => {
-    setPaginationState((prev) => ({
-      ...prev,
-      sortBy: column.sortField || column.selector,
-      sortOrder: sortDirection,
-      page: 1,
-    }));
-  };
+  // Handle sorting - REMOVED sortServer, using client-side sorting
+  // The DataTable component will handle sorting internally
 
   // Export to CSV
   const handleExport = () => {
@@ -452,10 +423,7 @@ const InvoicingPage = () => {
         return;
       }
 
-      // ✅ Xero invoice direct URL
       const invoiceUrl = `https://go.xero.com/AccountsReceivable/View.aspx?InvoiceID=${row.xeroInvoiceId}`;
-
-      // ✅ Open in a new tab
       window.open(invoiceUrl, "_blank");
     });
   };
@@ -597,13 +565,9 @@ const InvoicingPage = () => {
             </div>
           }
           pagination
-          paginationServer
           paginationPerPage={paginationState.limit}
           paginationRowsPerPageOptions={[10, 25, 50, 100]}
-          onChangeRowsPerPage={handlePerRowsChange}
-          onChangePage={handlePageChange}
-          sortServer
-          onSort={handleSort}
+          paginationDefaultPage={1}
           noDataComponent={
             <div className="p-10 text-center text-gray-500">
               {hasActiveFilters
