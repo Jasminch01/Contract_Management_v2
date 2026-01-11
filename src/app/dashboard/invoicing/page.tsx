@@ -144,7 +144,7 @@ const InvoicingPage = () => {
   // Pagination state - hardcoded to Invoiced status
   const [paginationState, setPaginationState] = useState<PaginationState>({
     page: 1,
-    limit: 25,
+    limit: 10,
     searchFilters: {},
     dateFrom: undefined,
     dateTo: undefined,
