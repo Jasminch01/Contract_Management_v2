@@ -130,6 +130,13 @@ const statusOptions = [
   { value: "Draft", label: "Draft" },
 ];
 
+const ChangeStatusOptions = [
+  { value: "Complete", label: "Complete" },
+  { value: "Incomplete", label: "Incomplete" },
+  { value: "Manually-Invoiced", label: "Manually Invoiced" },
+  { value: "Draft", label: "Draft" },
+];
+
 const rowsPerPageOptions = [10, 25, 50, 100];
 
 const ContractManagementPage = () => {
@@ -525,7 +532,7 @@ const ContractManagementPage = () => {
               autoFocus
             >
               <option value="">Select status</option>
-              {statusOptions.map((option) => (
+              {ChangeStatusOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -1431,7 +1438,7 @@ const ContractManagementPage = () => {
 
     try {
       // Check Outlook connection
-      const {connected}= await getOutlookConnectionStatus();
+      const { connected } = await getOutlookConnectionStatus();
 
       if (!connected) {
         toast.loading("Opening Outlook authorization...");
@@ -2331,7 +2338,8 @@ const ContractManagementPage = () => {
                     >
                       <span>• {contract.contractNumber}</span>
                       <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100">
-                        Current: {contract.status.replace("_", " ") || "Unknown"}
+                        Current:{" "}
+                        {contract.status.replace("_", " ") || "Unknown"}
                       </span>
                     </div>
                   ))}

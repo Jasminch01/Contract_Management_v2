@@ -4,14 +4,10 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import DataTable from "react-data-table-component";
 import toast, { Toaster } from "react-hot-toast";
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IoWarning } from "react-icons/io5";
 import { RiCircleFill } from "react-icons/ri";
-import { MdDelete, MdFileDownload } from "react-icons/md";
+import { MdDelete, MdFileDownload, MdClose } from "react-icons/md";
 import { fetchContracts, updateContract } from "@/api/ContractAPi";
 import { TContract, ContractsPaginatedResponse } from "@/types/types";
 import InvoiceSearchFilter from "@/components/contract/InvoiceSearchFilter";
@@ -25,6 +21,109 @@ interface PaginationState {
   sortBy: string;
   sortOrder: "asc" | "desc";
 }
+
+// Delete Warning Modal Component
+interface DeleteWarningModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  selectedCount: number;
+  isDeleting?: boolean;
+}
+
+const DeleteWarningModal: React.FC<DeleteWarningModalProps> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  selectedCount,
+  isDeleting = false,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4 animate-fadeIn">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+              <IoWarning className="text-red-600 text-2xl" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Confirm Deletion
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={isDeleting}
+            className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
+          >
+            <MdClose className="text-2xl" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          <p className="text-gray-700 mb-4">
+            You are about to mark{" "}
+            <span className="font-semibold text-gray-900">
+              {selectedCount} contract{selectedCount > 1 ? "s" : ""}
+            </span>{" "}
+            remove {selectedCount > 1 ? "them" : "it"} from the invoiced list.
+          </p>
+
+          <p className="text-sm text-gray-600 mt-4">
+            Are you sure you want to continue?
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 p-6 bg-gray-50 rounded-b-lg border-t border-gray-200">
+          <button
+            onClick={onClose}
+            disabled={isDeleting}
+            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isDeleting}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {isDeleting ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                Deleting...
+              </>
+            ) : (
+              <>
+                <IoWarning className="text-lg" />
+                Yes, Delete
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+      `}</style>
+    </div>
+  );
+};
 
 const columns = [
   {
@@ -119,7 +218,6 @@ const customStyles = {
   cells: {
     style: {
       borderRight: "1px solid #ddd",
-      // padding: "12px",
     },
   },
   headCells: {
@@ -141,11 +239,12 @@ const InvoicingPage = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [selectedRows, setSelectedRows] = useState<TContract[]>([]);
   const [toggleCleared, setToggleCleared] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Pagination state - hardcoded to Invoiced status
   const [paginationState, setPaginationState] = useState<PaginationState>({
     page: 1,
-    limit: 25,
+    limit: 10,
     searchFilters: {},
     dateFrom: undefined,
     dateTo: undefined,
@@ -171,17 +270,14 @@ const InvoicingPage = () => {
     },
 
     onMutate: async (contracts) => {
-      // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ["contracts", "invoiced"] });
 
-      // Snapshot previous value
       const previousContracts = queryClient.getQueryData([
         "contracts",
         "invoiced",
         paginationState,
       ]);
 
-      // Optimistically remove from invoiced list (since status changes to Complete)
       queryClient.setQueryData(
         ["contracts", "invoiced", paginationState],
         (old: any) => {
@@ -194,6 +290,7 @@ const InvoicingPage = () => {
             data: old.data.filter(
               (contract: TContract) => !contractIds.includes(contract._id)
             ),
+            total: (old.total || 0) - contracts.length,
             pagination: old.pagination
               ? {
                   ...old.pagination,
@@ -204,7 +301,6 @@ const InvoicingPage = () => {
         }
       );
 
-      // Clear selection immediately
       setSelectedRows([]);
       setToggleCleared((prev) => !prev);
 
@@ -227,7 +323,6 @@ const InvoicingPage = () => {
     },
 
     onError: (error: any, _, context) => {
-      // Rollback on error
       if (context?.previousContracts) {
         queryClient.setQueryData(
           ["contracts", "invoiced", paginationState],
@@ -243,29 +338,69 @@ const InvoicingPage = () => {
     },
   });
 
-  // Delete handler
+  // Delete handler - opens modal
   const handleDelete = () => {
     if (selectedRows.length === 0) {
       toast.error("Please select at least one contract to remove");
       return;
     }
+    setShowDeleteModal(true);
+  };
 
-    const confirmDelete = window.confirm(
-      `Are you sure you want to mark ${selectedRows.length} contract${
-        selectedRows.length > 1 ? "s" : ""
-      } as Complete and remove from invoiced list? This will clear Xero invoice data.`
-    );
-
-    if (confirmDelete) {
-      deleteMutation.mutate(selectedRows);
-    }
+  // Confirm delete - executes deletion
+  const confirmDelete = () => {
+    deleteMutation.mutate(selectedRows);
+    setShowDeleteModal(false);
   };
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Fetch contracts - only Invoiced status
+  // Build query params including search filters
+  const buildQueryParams = () => {
+    const params: any = {
+      page: paginationState.page,
+      limit: paginationState.limit,
+      status: "Invoiced",
+      sortBy: paginationState.sortBy,
+      sortOrder: paginationState.sortOrder,
+    };
+
+    // Add search filters to query params
+    Object.entries(paginationState.searchFilters).forEach(([key, value]) => {
+      if (value && value.trim() !== "") {
+        switch (key) {
+          case "contractNumber":
+            params.contractNumber = value.trim();
+            break;
+          case "ngr":
+            params.ngrNumber = value.trim();
+            break;
+          case "seller":
+            params.sellerName = value.trim();
+            break;
+          case "buyer":
+            params.buyerName = value.trim();
+            break;
+          default:
+            params[key] = value.trim();
+        }
+      }
+    });
+
+    // Add date filters
+    if (paginationState.dateFrom) {
+      params.dateFrom = paginationState.dateFrom;
+    }
+    if (paginationState.dateTo) {
+      params.dateTo = paginationState.dateTo;
+    }
+
+    return params;
+  };
+
+  // Fetch contracts - only Invoiced status with server-side filtering
   const {
     data: contractsResponse,
     isLoading,
@@ -276,69 +411,18 @@ const InvoicingPage = () => {
   } = useQuery<ContractsPaginatedResponse>({
     queryKey: ["contracts", "invoiced", paginationState],
     queryFn: () => {
-      return fetchContracts({
-        ...paginationState,
-        status: "Invoiced",
-      });
+      return fetchContracts(buildQueryParams());
     },
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     enabled: isMounted,
   });
 
-  // Extract and filter data
-  let contracts = contractsResponse?.data || [];
-
-  // Apply client-side filters
-  if (
-    Object.keys(paginationState.searchFilters).length > 0 ||
-    paginationState.dateFrom ||
-    paginationState.dateTo
-  ) {
-    contracts = contracts.filter((contract) => {
-      // Apply search filters
-      const searchMatch = Object.entries(paginationState.searchFilters).every(
-        ([key, value]) => {
-          if (!value) return true;
-
-          const searchValue = value.toLowerCase();
-
-          switch (key) {
-            case "contractNumber":
-              return contract.contractNumber
-                ?.toLowerCase()
-                .includes(searchValue);
-            case "ngr":
-              return (
-                contract.ngrNumber?.toLowerCase().includes(searchValue) ||
-                contract.seller?.mainNgr?.toLowerCase().includes(searchValue)
-              );
-            case "seller":
-              return contract.seller?.legalName
-                ?.toLowerCase()
-                .includes(searchValue);
-            case "buyer":
-              return contract.buyer?.name?.toLowerCase().includes(searchValue);
-            default:
-              return true;
-          }
-        }
-      );
-
-      // Apply date filters
-      const contractDate = new Date(
-        contract.contractDate || contract.createdAt
-      );
-      const dateFromMatch =
-        !paginationState.dateFrom ||
-        contractDate >= new Date(paginationState.dateFrom);
-      const dateToMatch =
-        !paginationState.dateTo ||
-        contractDate <= new Date(paginationState.dateTo + "T23:59:59");
-
-      return searchMatch && dateFromMatch && dateToMatch;
-    });
-  }
+  // Extract data from response
+  const contracts = contractsResponse?.data || [];
+  const totalRecords = contractsResponse?.total || 0;
+  const currentPage = contractsResponse?.page || 1;
+  const totalPages = contractsResponse?.totalPages || 0;
 
   // Handle filter change from InvoiceSearchFilter
   const handleFilterChange = (filters: {
@@ -452,10 +536,7 @@ const InvoicingPage = () => {
         return;
       }
 
-      // ✅ Xero invoice direct URL
       const invoiceUrl = `https://go.xero.com/AccountsReceivable/View.aspx?InvoiceID=${row.xeroInvoiceId}`;
-
-      // ✅ Open in a new tab
       window.open(invoiceUrl, "_blank");
     });
   };
@@ -508,6 +589,16 @@ const InvoicingPage = () => {
   return (
     <div className="mt-20">
       <Toaster />
+
+      {/* Delete Warning Modal */}
+      <DeleteWarningModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={confirmDelete}
+        selectedCount={selectedRows.length}
+        isDeleting={deleteMutation.isPending}
+      />
+
       <div className="px-5">
         {/* Header */}
         <div className="mb-6">
@@ -561,8 +652,9 @@ const InvoicingPage = () => {
         {/* Results Summary */}
         <div className="mb-3 flex items-center justify-between">
           <p className="text-sm text-gray-600">
-            Showing <span className="font-semibold">{contracts.length}</span>{" "}
-            invoiced contract{contracts.length !== 1 ? "s" : ""}
+            Showing <span className="font-semibold">{contracts.length}</span> of{" "}
+            <span className="font-semibold">{totalRecords}</span> invoiced
+            contract{totalRecords !== 1 ? "s" : ""}
             {hasActiveFilters && " (filtered)"}
           </p>
           {selectedRows.length > 0 && (
@@ -571,6 +663,16 @@ const InvoicingPage = () => {
             </span>
           )}
         </div>
+
+        {/* Pagination Info */}
+        {totalRecords > 0 && (
+          <p className="text-xs text-gray-500 mb-3">
+            Page {currentPage} of {totalPages} • Showing{" "}
+            {(currentPage - 1) * paginationState.limit + 1} to{" "}
+            {Math.min(currentPage * paginationState.limit, totalRecords)}{" "}
+            entries
+          </p>
+        )}
       </div>
 
       {/* DataTable */}
@@ -597,10 +699,19 @@ const InvoicingPage = () => {
             </div>
           }
           pagination
+          paginationServer
+          paginationTotalRows={totalRecords}
+          paginationDefaultPage={currentPage}
           paginationPerPage={paginationState.limit}
           paginationRowsPerPageOptions={[10, 25, 50, 100]}
           onChangeRowsPerPage={handlePerRowsChange}
           onChangePage={handlePageChange}
+          paginationComponentOptions={{
+            rowsPerPageText: "Rows per page:",
+            rangeSeparatorText: "of",
+            noRowsPerPage: false,
+            selectAllRowsItem: false,
+          }}
           sortServer
           onSort={handleSort}
           noDataComponent={
