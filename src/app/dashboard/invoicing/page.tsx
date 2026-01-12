@@ -12,6 +12,8 @@ import { fetchContracts, updateContract } from "@/api/ContractAPi";
 import { TContract, ContractsPaginatedResponse } from "@/types/types";
 import InvoiceSearchFilter from "@/components/contract/InvoiceSearchFilter";
 
+
+
 interface PaginationState {
   page: number;
   limit: number;
