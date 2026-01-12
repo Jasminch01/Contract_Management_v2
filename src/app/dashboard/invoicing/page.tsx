@@ -41,7 +41,7 @@ const DeleteWarningModal: React.FC<DeleteWarningModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-50">
       <div className="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4 animate-fadeIn">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -67,11 +67,10 @@ const DeleteWarningModal: React.FC<DeleteWarningModalProps> = ({
           <p className="text-gray-700 mb-4">
             You are about to mark{" "}
             <span className="font-semibold text-gray-900">
-              {selectedCount} contract{selectedCount > 1 ? "s" : ""}
-            </span>{" "}
-            remove {selectedCount > 1 ? "them" : "it"} from the invoiced list.
+              {selectedCount} Invoiced contract{selectedCount > 1 ? "s" : ""}
+            </span> to remove {selectedCount > 1 ? "them" : "it"} from the invoiced
+            list.
           </p>
-
           <p className="text-sm text-gray-600 mt-4">
             Are you sure you want to continue?
           </p>
@@ -89,7 +88,7 @@ const DeleteWarningModal: React.FC<DeleteWarningModalProps> = ({
           <button
             onClick={onConfirm}
             disabled={isDeleting}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="px-4 py-2 bg-red-700 cursor-pointer text-white rounded-lg hover:bg-red-800 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {isDeleting ? (
               <>
@@ -634,7 +633,7 @@ const InvoicingPage = () => {
             <button
               onClick={handleDelete}
               disabled={selectedRows.length === 0 || deleteMutation.isPending}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
+              className="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2 font-medium"
             >
               <MdDelete className="text-xl" />
               {deleteMutation.isPending
