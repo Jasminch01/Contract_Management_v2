@@ -460,32 +460,11 @@ const InvoicingPage = () => {
     );
   };
 
-  // Handle pagination
-  const handlePageChange = (page: number) => {
-    setPaginationState((prev) => ({ ...prev, page }));
-    setSelectedRows([]);
-    setToggleCleared((prev) => !prev);
-  };
+  // Handle pagination - REMOVED because we're using client-side pagination
+  // The DataTable component will handle pagination internally
 
-  const handlePerRowsChange = (newPerPage: number) => {
-    setPaginationState((prev) => ({
-      ...prev,
-      limit: newPerPage,
-      page: 1,
-    }));
-    setSelectedRows([]);
-    setToggleCleared((prev) => !prev);
-  };
-
-  // Handle sorting
-  const handleSort = (column: any, sortDirection: "asc" | "desc") => {
-    setPaginationState((prev) => ({
-      ...prev,
-      sortBy: column.sortField || column.selector,
-      sortOrder: sortDirection,
-      page: 1,
-    }));
-  };
+  // Handle sorting - REMOVED sortServer, using client-side sorting
+  // The DataTable component will handle sorting internally
 
   // Export to CSV
   const handleExport = () => {
