@@ -12,8 +12,6 @@ import { fetchContracts, updateContract } from "@/api/ContractAPi";
 import { TContract, ContractsPaginatedResponse } from "@/types/types";
 import InvoiceSearchFilter from "@/components/contract/InvoiceSearchFilter";
 
-
-
 interface PaginationState {
   page: number;
   limit: number;
@@ -70,7 +68,8 @@ const DeleteWarningModal: React.FC<DeleteWarningModalProps> = ({
             You are about to mark{" "}
             <span className="font-semibold text-gray-900">
               {selectedCount} Invoiced contract{selectedCount > 1 ? "s" : ""}
-            </span> to remove {selectedCount > 1 ? "them" : "it"} from the invoiced
+            </span>{" "}
+            to remove {selectedCount > 1 ? "them" : "it"} from the invoiced
             list.
           </p>
           <p className="text-sm text-gray-600 mt-4">
@@ -253,6 +252,31 @@ const InvoicingPage = () => {
     sortOrder: "desc",
   });
   const queryClient = useQueryClient();
+
+  const handleSort = (column: any, sortDirection: "asc" | "desc") => {
+    setPaginationState((prev) => ({
+      ...prev,
+      sortBy: column.sortField || column.selector,
+      sortOrder: sortDirection,
+      page: 1,
+    }));
+  };
+
+  const handlePageChange = (page: number) => {
+    setPaginationState((prev) => ({ ...prev, page }));
+    setSelectedRows([]);
+    setToggleCleared((prev) => !prev);
+  };
+
+  const handlePerRowsChange = (newPerPage: number) => {
+    setPaginationState((prev) => ({
+      ...prev,
+      limit: newPerPage,
+      page: 1,
+    }));
+    setSelectedRows([]);
+    setToggleCleared((prev) => !prev);
+  };
 
   // Delete mutation
   const deleteMutation = useMutation({
