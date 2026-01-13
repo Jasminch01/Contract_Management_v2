@@ -484,12 +484,6 @@ const InvoicingPage = () => {
     );
   };
 
-  // Handle pagination - REMOVED because we're using client-side pagination
-  // The DataTable component will handle pagination internally
-
-  // Handle sorting - REMOVED sortServer, using client-side sorting
-  // The DataTable component will handle sorting internally
-
   // Export to CSV
   const handleExport = () => {
     const dataToExport = selectedRows.length > 0 ? selectedRows : contracts;
