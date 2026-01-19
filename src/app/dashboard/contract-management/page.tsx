@@ -124,7 +124,7 @@ const updateStatusOptions = [
 
 const statusOptions = [
   { value: "Complete", label: "Complete" },
-  { value: "Incomplete", label: "Incomplete" },
+  { value: "Incomplete", label: "Incomplete" }, 
   { value: "Invoiced", label: "Invoiced" },
   { value: "Manually-Invoiced", label: "Manually Invoiced" },
   { value: "Draft", label: "Draft" },
@@ -911,9 +911,6 @@ const ContractManagementPage = () => {
     try {
       // Check current connection status
       const status = await getXeroConnectionStatus();
-
-      console.log("Xero Status:", status);
-
       // If not connected, automatically initiate connection
       if (!status.connected || !status.tenantName) {
         toast.loading("Connecting to Xero...");
@@ -1411,13 +1408,98 @@ const ContractManagementPage = () => {
       toast.error("Selected contract is invalid");
     }
   };
-  const handleEmail = async (recipientType: "buyer" | "seller") => {
-    if (selectedRows.length === 0) {
-      toast.error(
-        `Please select at least one contract to email ${recipientType}`
-      );
+// Add this state with your other state declarations
+const [contractDescriptions, setContractDescriptions] = useState<string[]>([]);
+
+// Updated handleEmail function
+const handleEmail = async (recipientType: "buyer" | "seller") => {
+  if (selectedRows.length === 0) {
+    toast.error(
+      `Please select at least one contract to email ${recipientType}`
+    );
+    return;
+  }
+
+  const validRows = selectedRows.filter(
+    (row): row is TContract => row != null
+  );
+
+  const recipients = validRows
+    .map((row) =>
+      recipientType === "buyer" ? row.buyer?.email : row.seller?.email
+    )
+    .filter((email): email is string => Boolean(email));
+
+  if (recipients.length === 0) {
+    toast.error(
+      `No valid ${recipientType} emails found in selected contracts`
+    );
+    return;
+  }
+
+  try {
+    // Check Outlook connection
+    const { connected } = await getOutlookConnectionStatus();
+
+    if (!connected) {
+      toast.loading("Opening Outlook authorization...");
+
+      try {
+        await initiateOutlookAuth();
+        toast.dismiss();
+        toast.success("Outlook connected successfully!");
+
+        // Initialize contract descriptions and open email modal after connection
+        setEmailRecipientType(recipientType);
+        setEmailAdditionalText("");
+        setContractDescriptions(
+          validRows.map(contract => 
+            `${contract.contractNumber} - ${contract.tonnes}mt ${contract.grade} (${contract.buyer?.name} ↔ ${contract.seller?.legalName})`
+          )
+        );
+        setIsEmailModalOpen(true);
+      } catch (authError: any) {
+        toast.dismiss();
+        toast.error(authError.message || "Failed to authorize Outlook");
+      }
       return;
     }
+
+    // Already connected - initialize contract descriptions and open email modal
+    setEmailRecipientType(recipientType);
+    setEmailAdditionalText("");
+    setContractDescriptions(
+      validRows.map(contract => 
+        `${contract.contractNumber} - ${contract.tonnes}mt ${contract.grade} (${contract.buyer?.name} ↔ ${contract.seller?.legalName})`
+      )
+    );
+    setIsEmailModalOpen(true);
+  } catch (error: any) {
+    toast.dismiss();
+    toast.error(error.message || "Failed to verify Outlook connection");
+  }
+};
+
+// Helper functions for managing contract descriptions
+const handleContractDescriptionChange = (index: number, value: string) => {
+  const newDescriptions = [...contractDescriptions];
+  newDescriptions[index] = value;
+  setContractDescriptions(newDescriptions);
+};
+
+const addCustomContract = () => {
+  setContractDescriptions([...contractDescriptions, '']);
+};
+
+const removeContract = (index: number) => {
+  const newDescriptions = contractDescriptions.filter((_, i) => i !== index);
+  setContractDescriptions(newDescriptions);
+};
+
+// Updated confirmSendEmail function
+const confirmSendEmail = async () => {
+  try {
+    toast.loading("Generating PDF and sending email...");
 
     const validRows = selectedRows.filter(
       (row): row is TContract => row != null
@@ -1425,102 +1507,50 @@ const ContractManagementPage = () => {
 
     const recipients = validRows
       .map((row) =>
-        recipientType === "buyer" ? row.buyer?.email : row.seller?.email
+        emailRecipientType === "buyer" ? row.buyer?.email : row.seller?.email
       )
       .filter((email): email is string => Boolean(email));
 
     if (recipients.length === 0) {
-      toast.error(
-        `No valid ${recipientType} emails found in selected contracts`
-      );
+      toast.dismiss();
+      toast.error("No valid email addresses found");
       return;
     }
 
-    try {
-      // Check Outlook connection
-      const { connected } = await getOutlookConnectionStatus();
+    const pdfBlob = await generatePDFBlobFromComponent(validRows);
 
-      if (!connected) {
-        toast.loading("Opening Outlook authorization...");
-
-        try {
-          await initiateOutlookAuth();
-          toast.dismiss();
-          toast.success("Outlook connected successfully!");
-
-          // Retry opening email modal after connection
-          setEmailRecipientType(recipientType);
-          setEmailAdditionalText("");
-          setIsEmailModalOpen(true);
-        } catch (authError: any) {
-          toast.dismiss();
-          toast.error(authError.message || "Failed to authorize Outlook");
-        }
-        return;
-      }
-
-      // Already connected - open email modal
-      setEmailRecipientType(recipientType);
-      setEmailAdditionalText("");
-      setIsEmailModalOpen(true);
-    } catch (error: any) {
+    if (!pdfBlob) {
       toast.dismiss();
-      toast.error(error.message || "Failed to verify Outlook connection");
+      throw new Error("Failed to generate PDF");
     }
-  };
 
-  const confirmSendEmail = async () => {
-    try {
-      toast.loading("Generating PDF and sending email...");
+    const response = await sendContractEmail({
+      recipients,
+      recipientType: emailRecipientType,
+      contracts: validRows,
+      contractDescriptions: contractDescriptions,
+      additionalText: emailAdditionalText,
+      pdf: pdfBlob,
+    });
 
-      const validRows = selectedRows.filter(
-        (row): row is TContract => row != null
-      );
+    toast.dismiss();
 
-      const recipients = validRows
-        .map((row) =>
-          emailRecipientType === "buyer" ? row.buyer?.email : row.seller?.email
-        )
-        .filter((email): email is string => Boolean(email));
-
-      if (recipients.length === 0) {
-        toast.dismiss();
-        toast.error("No valid email addresses found");
-        return;
-      }
-
-      const pdfBlob = await generatePDFBlobFromComponent(validRows);
-
-      if (!pdfBlob) {
-        toast.dismiss();
-        throw new Error("Failed to generate PDF");
-      }
-
-      const response = await sendContractEmail({
-        recipients,
-        recipientType: emailRecipientType,
-        contracts: validRows,
-        additionalText: emailAdditionalText,
-        pdf: pdfBlob,
-      });
-
-      toast.dismiss();
-
-      if (!response.success) {
-        throw new Error(response.message);
-      }
-
-      toast.success(
-        `Email sent successfully to ${recipients.length} ${emailRecipientType}(s)!`
-      );
-
-      setIsEmailModalOpen(false);
-      setEmailAdditionalText("");
-    } catch (error: any) {
-      toast.dismiss();
-      toast.error(error.message || "Failed to send email");
+    if (!response.success) {
+      throw new Error(response.message);
     }
-  };
+
+    toast.success(
+      `Email sent successfully to ${recipients.length} ${emailRecipientType}(s)!`
+    );
+
+    setIsEmailModalOpen(false);
+    setEmailAdditionalText("");
+    setContractDescriptions([]);
+  } catch (error: any) {
+    toast.dismiss();
+    toast.error(error.message || "Failed to send email");
+  }
+};      
 
   const generatePDFBlobFromComponent = async (
     contracts: TContract[]
@@ -2170,148 +2200,174 @@ const ContractManagementPage = () => {
 
       {/* Email Confirmation Modal */}
       {isEmailModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-50  bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold flex gap-x-3 items-center">
-                  <IoIosSend className="text-blue-600 text-2xl" />
-                  Send Email to{" "}
-                  {emailRecipientType === "buyer" ? "Buyer" : "Seller"}
-                </h3>
+          <div className="fixed inset-0 flex items-center justify-center z-50  bg-opacity-50">
+            <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-semibold flex gap-x-3 items-center">
+                    <IoIosSend className="text-blue-600 text-2xl" />
+                    Send Email to{" "}
+                    {emailRecipientType === "buyer" ? "Buyer" : "Seller"}
+                  </h3>
+                </div>
               </div>
-            </div>
 
-            <div className="px-6 py-4">
-              {/* Recipient Summary */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                <h4 className="font-semibold text-gray-800 mb-3">
-                  Email Recipients (
-                  {
-                    selectedRows.filter((row) =>
-                      emailRecipientType === "buyer"
-                        ? row.buyer?.email
-                        : row.seller?.email
-                    ).length
-                  }
-                  )
-                </h4>
-                <div className="space-y-2 text-sm">
-                  {selectedRows
-                    .filter((row) =>
-                      emailRecipientType === "buyer"
-                        ? row.buyer?.email
-                        : row.seller?.email
+              <div className="px-6 py-4">
+                {/* Recipient Summary */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                  <h4 className="font-semibold text-gray-800 mb-3">
+                    Email Recipients (
+                    {
+                      selectedRows.filter((row) =>
+                        emailRecipientType === "buyer"
+                          ? row.buyer?.email
+                          : row.seller?.email
+                      ).length
+                    }
                     )
-                    .map((contract, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <span className="text-gray-600">•</span>
-                        <span className="font-medium">
-                          {emailRecipientType === "buyer"
-                            ? contract.buyer?.name
-                            : contract.seller?.legalName}
-                        </span>
-                        <span className="text-gray-500">
-                          (
-                          {emailRecipientType === "buyer"
-                            ? contract.buyer?.email
-                            : contract.seller?.email}
-                          )
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </div>
-
-              {/* Contract Summary */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-                <h4 className="font-semibold text-gray-800 mb-3">
-                  Contracts to be Sent ({selectedRows.length})
-                </h4>
-                <div className="space-y-2 text-sm max-h-40 overflow-y-auto">
-                  {selectedRows.map((contract, idx) => (
-                    <div key={idx} className="text-gray-700">
-                      • {contract.contractNumber} - {contract.tonnes}mt{" "}
-                      {contract.grade}({contract.buyer?.name} ↔{" "}
-                      {contract.seller?.legalName})
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Additional Message Input */}
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Additional Message (Optional)
-                  </label>
-                  <textarea
-                    value={emailAdditionalText}
-                    onChange={(e) => setEmailAdditionalText(e.target.value)}
-                    placeholder="Add any additional message to include in the email body..."
-                    rows={5}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    This text will be added to the standard email template
-                    before the contract summary.
-                  </p>
-                </div>
-
-                {/* Email Preview */}
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-800 mb-2 text-sm">
-                    Email Preview
                   </h4>
-                  <div className="text-sm text-gray-700 space-y-2 whitespace-pre-wrap">
-                    <p>
-                      Dear {emailRecipientType === "buyer" ? "Buyer" : "Seller"}
-                      ,
+                  <div className="space-y-2 text-sm">
+                    {selectedRows
+                      .filter((row) =>
+                        emailRecipientType === "buyer"
+                          ? row.buyer?.email
+                          : row.seller?.email
+                      )
+                      .map((contract, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <span className="text-gray-600">•</span>
+                          <span className="font-medium">
+                            {emailRecipientType === "buyer"
+                              ? contract.buyer?.name
+                              : contract.seller?.legalName}
+                          </span>
+                          <span className="text-gray-500">
+                            (
+                            {emailRecipientType === "buyer"
+                              ? contract.buyer?.email
+                              : contract.seller?.email}
+                            )
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* Contract Summary */}
+               {/* Editable Contract Summary - Replace existing Contract Summary section */}
+<div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+  <div className="flex items-center justify-between mb-3">
+    <h4 className="font-semibold text-gray-800">
+      Contracts to be Sent ({contractDescriptions.length})
+    </h4>
+    <button
+      onClick={addCustomContract}
+      className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+    >
+      + Add Entry
+    </button>
+  </div>
+  <div className="space-y-3 max-h-60 overflow-y-auto">
+    {contractDescriptions.map((description, idx) => (
+      <div key={idx} className="flex items-start gap-2">
+        <span className="text-gray-600 mt-2">•</span>
+        <input
+          type="text"
+          value={description}
+          onChange={(e) => handleContractDescriptionChange(idx, e.target.value)}
+          placeholder="Enter contract description..."
+          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button
+          onClick={() => removeContract(idx)}
+          className="text-red-600 hover:text-red-800 px-2 py-2 transition-colors"
+          title="Remove"
+        >
+          ✕
+        </button>
+      </div>
+    ))}
+    {contractDescriptions.length === 0 && (
+      <p className="text-sm text-gray-500 italic text-center py-4">
+        No contracts added. Click &quot;+ Add Entry&quot; to add a contract.
+      </p>
+    )}
+  </div>
+</div>
+
+                {/* Additional Message Input */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Additional Message (Optional)
+                    </label>
+                    <textarea
+                      value={emailAdditionalText}
+                      onChange={(e) => setEmailAdditionalText(e.target.value)}
+                      placeholder="Add any additional message to include in the email body..."
+                      rows={5}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      This text will be added to the standard email template
+                      before the contract summary.
                     </p>
-                    {emailAdditionalText && (
-                      <p className="bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
-                        {emailAdditionalText}
+                  </div>
+
+                  {/* Email Preview */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-800 mb-2 text-sm">
+                      Email Preview
+                    </h4>
+                    <div className="text-sm text-gray-700 space-y-2 whitespace-pre-wrap">
+                      <p>
+                        Dear {emailRecipientType === "buyer" ? "Buyer" : "Seller"}
+                        ,
                       </p>
-                    )}
-                    <p>Please find the contract document(s) attached.</p>
-                    <p className="text-xs text-gray-500 italic">
-                      [Contract summary will be included here]
-                    </p>
-                    <p>
-                      If you have any questions, please don&apos;t hesitate to
-                      contact us.
-                    </p>
-                    <p>
-                      Best regards,
-                      <br />
-                      Growth Grain Services
-                    </p>
+                      {emailAdditionalText && (
+                        <p className="bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
+                          {emailAdditionalText}
+                        </p>
+                      )}
+                      <p>Please find the contract document(s) attached.</p>
+                      <p className="text-xs text-gray-500 italic">
+                        [Contract summary will be included here]
+                      </p>
+                      <p>
+                        If you have any questions, please don&apos;t hesitate to
+                        contact us.
+                      </p>
+                      <p>
+                        Best regards,
+                        <br />
+                        Growth Grain Services
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Modal Actions */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 sticky bottom-0 bg-white">
-              <button
-                onClick={() => {
-                  setIsEmailModalOpen(false);
-                  setEmailAdditionalText("");
-                }}
-                className="px-5 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmSendEmail}
-                className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
-              >
-                <IoIosSend />
-                Send Email
-              </button>
+              {/* Modal Actions */}
+              <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 sticky bottom-0 bg-white">
+                <button
+                  onClick={() => {
+                    setIsEmailModalOpen(false);
+                    setEmailAdditionalText("");
+                  }}
+                  className="px-5 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmSendEmail}
+                  className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2 transition-colors"
+                >
+                  <IoIosSend />
+                  Send Email
+                </button>
+              </div>
             </div>
           </div>
-        </div>
       )}
 
       {isBulkStatusModalOpen && (

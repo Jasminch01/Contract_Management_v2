@@ -82,10 +82,12 @@ export const initiateOutlookAuth = (): Promise<boolean> => {
   });
 };
 
+// Updated interfaces
 interface SendContractEmailRequest {
   recipients: string[];
   recipientType: "buyer" | "seller";
   contracts: any[];
+  contractDescriptions: string[]; // Add this field
   additionalText: string;
   pdf: Blob;
 }
@@ -95,6 +97,7 @@ interface SendContractEmailResponse {
   message: string;
 }
 
+// Updated API function
 export const sendContractEmail = async (
   data: SendContractEmailRequest
 ): Promise<SendContractEmailResponse> => {
@@ -108,6 +111,7 @@ export const sendContractEmail = async (
     formData.append("recipients", JSON.stringify(data.recipients));
     formData.append("recipientType", data.recipientType);
     formData.append("contracts", JSON.stringify(data.contracts));
+    formData.append("contractDescriptions", JSON.stringify(data.contractDescriptions)); // Add this
     formData.append("additionalText", data.additionalText || "");
 
     const response = await instance.post<SendContractEmailResponse>(
