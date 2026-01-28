@@ -1,20 +1,25 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import DataTable from "react-data-table-component";
 import toast, { Toaster } from "react-hot-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { HiOutlineDocumentDuplicate } from "react-icons/hi";
-import { IoIosPersonAdd, IoIosSend } from "react-icons/io";
+import { IoIosCloseCircle, IoIosPersonAdd, IoIosSend } from "react-icons/io";
 import { IoFilterSharp, IoWarning } from "react-icons/io5";
 import { MdOutlineEdit } from "react-icons/md";
 import { RiCircleFill, RiDeleteBin6Fill } from "react-icons/ri";
 import ExportCsv from "@/components/contract/ExportCsv";
 import PdfExportButton from "@/components/contract/PdfExportButton";
 import AdvanceSearchFilter from "@/components/contract/AdvanceSearchFilter";
-import { fetchContracts, moveContractToTrash } from "@/api/ContractAPi";
+import {
+  bulkUpdateContractStatus,
+  fetchContracts,
+  moveContractToTrash,
+  updateContract,
+} from "@/api/ContractAPi";
 import {
   TContract,
   FetchContractsParams,
@@ -29,6 +34,12 @@ import {
   getXeroConnectionStatus,
 } from "@/api/xeroApi";
 import { GiPaperClip } from "react-icons/gi";
+import {
+  getOutlookConnectionStatus,
+  initiateOutlookAuth,
+  sendContractEmail,
+} from "@/api/emailApi";
+import { satoshiFont } from "@/font/font";
 
 // Types for pagination parameters
 interface PaginationState {
@@ -52,6 +63,8 @@ const saveFiltersToStorage = (state: PaginationState) => {
   }
 };
 
+// Add these handler functions (around line 470)
+
 const loadFiltersFromStorage = (): Partial<PaginationState> | null => {
   try {
     const stored = localStorage.getItem(FILTER_STORAGE_KEY);
@@ -71,135 +84,6 @@ const clearFiltersFromStorage = () => {
     console.error("Error clearing filters from localStorage:", error);
   }
 };
-
-const columns = [
-  {
-    name: "DATE",
-    selector: (row: TContract) => {
-      if (!row?.createdAt) return "";
-      const date = new Date(row.contractDate || row.createdAt);
-      return date.toLocaleDateString();
-    },
-    sortable: true,
-    sortField: "contractDate",
-  },
-  {
-    name: "CONTRACT NUMBER",
-    selector: (row: TContract) => row?.contractNumber || "",
-    sortable: true,
-    sortField: "contractNumber",
-  },
-  {
-    name: "SEASON",
-    selector: (row: TContract) => row?.season || "",
-    sortable: true,
-    sortField: "season",
-  },
-  {
-    name: "NGR",
-    selector: (row: TContract) => row?.ngrNumber || row?.seller?.mainNgr || "",
-    sortable: true,
-    sortField: "ngrNumber",
-  },
-  {
-    name: "SELLER",
-    selector: (row: TContract) => row?.seller?.legalName || "",
-    sortable: true,
-    sortField: "seller.legalName",
-  },
-  {
-    name: "SELLER ATTACHMENT",
-    cell: (row: TContract) =>
-      row?.attachedSellerContract ? (
-        <a
-          href={row.attachedSellerContract}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-blue-600 hover:underline"
-        >
-          <GiPaperClip size={16} /> View
-        </a>
-      ) : (
-        <span className="text-gray-400">N/A</span>
-      ),
-    sortable: true,
-    sortField: "seller.legalName",
-  },
-  {
-    name: "GRADE",
-    selector: (row: TContract) => row?.grade || "",
-    sortable: true,
-    sortField: "grade",
-  },
-  {
-    name: "TONNES",
-    selector: (row: TContract) => row?.tonnes || "",
-    sortable: true,
-    sortField: "tonnes",
-  },
-  {
-    name: "BUYER",
-    selector: (row: TContract) => row?.buyer?.name || "",
-    sortable: true,
-    sortField: "buyer.name",
-  },
-  {
-    name: "BUYER ATTACHMENT",
-    cell: (row: TContract) =>
-      row?.attachedBuyerContract ? (
-        <a
-          href={row.attachedBuyerContract}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-blue-600 hover:underline"
-        >
-          <GiPaperClip size={16} /> View
-        </a>
-      ) : (
-        <span className="text-gray-400">N/A</span>
-      ),
-    sortable: true,
-    sortField: "seller.legalName",
-  },
-  {
-    name: "DESTINATION",
-    selector: (row: TContract) => row?.deliveryDestination || "",
-    sortable: true,
-    sortField: "deliveryDestination",
-  },
-  {
-    name: "CONTRACT PRICE",
-    selector: (row: TContract) => row?.priceExGST || 0,
-    sortable: true,
-    sortField: "priceExGST",
-  },
-  {
-    name: "STATUS",
-    selector: (row: TContract) => row?.status || "",
-    sortable: true,
-    sortField: "status",
-    cell: (row: TContract) => (
-      <p className={`text-xs flex items-center gap-x-3`}>
-        <RiCircleFill
-          className={`${
-            row.status?.toLowerCase() === "complete"
-              ? "text-[#108A2B]"
-              : row.status?.toLowerCase() === "invoiced"
-              ? "text-[#3B82F6]"
-              : row.status?.toLowerCase() === "draft"
-              ? "text-[#EF4444]"
-              : "text-[#FAD957]"
-          }`}
-        />
-        {row.status || "Unknown"}
-      </p>
-    ),
-  },
-  {
-    name: "NOTES",
-    selector: (row: TContract) => row.notes || "",
-  },
-];
 
 const customStyles = {
   rows: {
@@ -232,10 +116,25 @@ const customStyles = {
   },
 };
 
+const updateStatusOptions = [
+  { value: "Complete", label: "Complete" },
+  { value: "Incomplete", label: "Incomplete" },
+  { value: "Manually-Invoiced", label: "Manually Invoiced" },
+  { value: "Draft", label: "Draft" },
+];
+
 const statusOptions = [
   { value: "Complete", label: "Complete" },
   { value: "Incomplete", label: "Incomplete" },
   { value: "Invoiced", label: "Invoiced" },
+  { value: "Manually-Invoiced", label: "Manually Invoiced" },
+  { value: "Draft", label: "Draft" },
+];
+
+const ChangeStatusOptions = [
+  { value: "Complete", label: "Complete" },
+  { value: "Incomplete", label: "Incomplete" },
+  { value: "Manually-Invoiced", label: "Manually Invoiced" },
   { value: "Draft", label: "Draft" },
 ];
 
@@ -252,6 +151,452 @@ const ContractManagementPage = () => {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [isFilterActive, setIsFilterActive] = useState(false);
   const [toggleCleared, setToggleCleared] = useState(false);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [emailRecipientType, setEmailRecipientType] = useState<
+    "buyer" | "seller"
+  >("buyer");
+  const [emailAdditionalText, setEmailAdditionalText] = useState("");
+
+  const [editingStatusRowId, setEditingStatusRowId] = useState<string | null>(
+    null,
+  );
+  const [tempStatus, setTempStatus] = useState<string>("");
+  const [isBulkStatusModalOpen, setIsBulkStatusModalOpen] = useState(false);
+  const [bulkStatusValue, setBulkStatusValue] = useState<string>("");
+
+  const [emailRecipients, setEmailRecipients] = useState<
+    Array<{
+      id: string;
+      email: string;
+      name: string;
+      isCustom: boolean;
+    }>
+  >([]);
+  const [newRecipientEmail, setNewRecipientEmail] = useState("");
+
+  const bulkUpdateStatusMutation = useMutation({
+    mutationFn: async ({
+      contractIds,
+      newStatus,
+    }: {
+      contractIds: string[];
+      newStatus: string;
+    }) => {
+      const response = await bulkUpdateContractStatus(contractIds, newStatus);
+      return response;
+    },
+
+    onMutate: async ({ contractIds, newStatus }) => {
+      await queryClient.cancelQueries({ queryKey: ["contracts"] });
+      const previousContracts = queryClient.getQueryData(["contracts"]);
+
+      // Optimistically update
+      queryClient.setQueryData(["contracts"], (old: any) => {
+        if (!old) return old;
+
+        if (Array.isArray(old)) {
+          return old.map((contract) =>
+            contractIds.includes(contract.id)
+              ? { ...contract, status: newStatus }
+              : contract,
+          );
+        }
+
+        if (old.data && Array.isArray(old.data)) {
+          return {
+            ...old,
+            data: old.data.map((contract: any) =>
+              contractIds.includes(contract._id)
+                ? { ...contract, status: newStatus }
+                : contract,
+            ),
+          };
+        }
+
+        return old;
+      });
+
+      setIsBulkStatusModalOpen(false);
+      setBulkStatusValue("");
+      setSelectedRows([]);
+      setToggleCleared((prev) => !prev);
+
+      toast.success(`Updating ${contractIds.length} contract(s)...`);
+
+      return { previousContracts };
+    },
+
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+      toast.dismiss();
+      toast.success(
+        `Successfully updated ${response.modifiedCount} contract(s) to "${response.contracts[0]?.status}"`,
+        { duration: 4000 },
+      );
+    },
+
+    onError: (error: any, variables, context) => {
+      if (context?.previousContracts) {
+        queryClient.setQueryData(["contracts"], context.previousContracts);
+      }
+
+      toast.dismiss();
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to update contract status";
+
+      toast.error(errorMessage, { duration: 4000 });
+
+      setIsBulkStatusModalOpen(false);
+      setBulkStatusValue("");
+    },
+  });
+
+  const handleBulkStatusUpdate = () => {
+    if (selectedRows.length === 0) {
+      toast.error("Please select at least one contract to update");
+      return;
+    }
+
+    // Check for invoiced contracts
+    const invoicedContracts = selectedRows.filter(
+      (row) =>
+        row.status?.toLowerCase() === "invoiced" ||
+        row.status?.toLowerCase() === "menually-invoiced",
+    );
+
+    if (invoicedContracts.length > 0) {
+      const invoicedNumbers = invoicedContracts
+        .map((c) => c.contractNumber)
+        .join(", ");
+
+      toast.error(
+        <div>
+          <p className="font-semibold">Cannot Update Invoiced Contracts</p>
+          <p className="text-sm mt-1">
+            The following contracts are already invoiced and their status cannot
+            be changed: {invoicedNumbers}
+          </p>
+        </div>,
+        { duration: 6000 },
+      );
+      return;
+    }
+
+    setBulkStatusValue("");
+    setIsBulkStatusModalOpen(true);
+  };
+
+  const confirmBulkStatusUpdate = () => {
+    if (!bulkStatusValue || bulkStatusValue === "") {
+      toast.error("Please select a status");
+      return;
+    }
+
+    const contractIds = selectedRows
+      .filter((row): row is TContract => row != null && row._id != null)
+      .map((row) => row._id!)
+      .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+    if (contractIds.length === 0) {
+      toast.error("No valid contracts selected for update");
+      setIsBulkStatusModalOpen(false);
+      return;
+    }
+
+    bulkUpdateStatusMutation.mutate({
+      contractIds,
+      newStatus: bulkStatusValue,
+    });
+  };
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({
+      contractId,
+      newStatus,
+    }: {
+      contractId: string;
+      newStatus: string;
+    }) => {
+      const statusUpdate = {
+        status: newStatus,
+      };
+
+      const response = await updateContract(statusUpdate as any, contractId);
+      return { contractId, newStatus, response };
+    },
+
+    // ✅ Optimistic update - runs immediately before API call
+    onMutate: async ({ contractId, newStatus }) => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ["contracts"] });
+
+      // Snapshot the previous value
+      const previousContracts = queryClient.getQueryData(["contracts"]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(["contracts"], (old: any) => {
+        if (!old) return old;
+
+        // Handle different data structures (array or paginated)
+        if (Array.isArray(old)) {
+          return old.map((contract) =>
+            contract.id === contractId
+              ? { ...contract, status: newStatus }
+              : contract,
+          );
+        }
+
+        // If paginated data structure
+        if (old.data && Array.isArray(old.data)) {
+          return {
+            ...old,
+            data: old.data.map((contract: any) =>
+              contract.id === contractId
+                ? { ...contract, status: newStatus }
+                : contract,
+            ),
+          };
+        }
+
+        return old;
+      });
+
+      setEditingStatusRowId(null);
+      setTempStatus("");
+
+      // Show immediate feedback
+      toast.success(`Status updated to "${newStatus}"`);
+
+      // Return context with the snapshot
+      return { previousContracts };
+    },
+
+    onSuccess: () => {
+      // Refetch to ensure data is in sync with server
+      queryClient.invalidateQueries({ queryKey: ["contracts"] });
+    },
+
+    // ✅ Rollback on error
+    onError: (error: any, variables, context) => {
+      // Restore previous data if mutation fails
+      if (context?.previousContracts) {
+        queryClient.setQueryData(["contracts"], context.previousContracts);
+      }
+
+      setEditingStatusRowId(null);
+      setTempStatus("");
+
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to update status. Please try again.";
+
+      toast.error(errorMessage);
+    },
+  });
+
+  const handleStatusClick = (
+    contractId: string,
+    currentStatus: string,
+    e: React.MouseEvent,
+  ) => {
+    e.stopPropagation(); // Prevent row click
+    setEditingStatusRowId(contractId);
+    setTempStatus(currentStatus);
+  };
+
+  const handleStatusSave = (contractId: string) => {
+    if (tempStatus && tempStatus !== "") {
+      updateStatusMutation.mutate({ contractId, newStatus: tempStatus });
+    }
+  };
+
+  const handleStatusCancel = () => {
+    setEditingStatusRowId(null);
+    setTempStatus("");
+  };
+
+  const columns = [
+    {
+      name: "DATE",
+      selector: (row: TContract) => {
+        if (!row?.createdAt) return "";
+        const date = new Date(row.contractDate || row.createdAt);
+        return date.toLocaleDateString();
+      },
+      sortable: true,
+      sortField: "contractDate",
+    },
+    {
+      name: "CONTRACT NUMBER",
+      selector: (row: TContract) => row?.contractNumber || "",
+      sortable: true,
+      sortField: "contractNumber",
+    },
+    {
+      name: "SEASON",
+      selector: (row: TContract) => row?.season || "",
+      sortable: true,
+      sortField: "season",
+    },
+    {
+      name: "NGR",
+      selector: (row: TContract) =>
+        row?.ngrNumber || row?.seller?.mainNgr || "",
+      sortable: true,
+      sortField: "ngrNumber",
+    },
+    {
+      name: "SELLER",
+      selector: (row: TContract) => row?.seller?.legalName || "",
+      sortable: true,
+      width: "200px",
+      sortField: "seller.legalName",
+    },
+    {
+      name: "SELLER ATTACHMENT",
+      cell: (row: TContract) =>
+        row?.attachedSellerContract ? (
+          <a
+            href={row.attachedSellerContract}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-blue-600 hover:underline"
+          >
+            <GiPaperClip size={16} /> View
+          </a>
+        ) : (
+          <span className="text-gray-400">N/A</span>
+        ),
+      sortable: true,
+      sortField: "seller.legalName",
+    },
+    {
+      name: "GRADE",
+      selector: (row: TContract) => row?.grade || "",
+      sortable: true,
+      sortField: "grade",
+    },
+    {
+      name: "TONNES",
+      selector: (row: TContract) => row?.tonnes || "",
+      sortable: true,
+      sortField: "tonnes",
+    },
+    {
+      name: "BUYER",
+      selector: (row: TContract) => row?.buyer?.name || "",
+      sortable: true,
+      width: "200px",
+      sortField: "buyer.name",
+    },
+    {
+      name: "BUYER ATTACHMENT",
+      cell: (row: TContract) =>
+        row?.attachedBuyerContract ? (
+          <a
+            href={row.attachedBuyerContract}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-blue-600 hover:underline"
+          >
+            <GiPaperClip size={16} /> View
+          </a>
+        ) : (
+          <span className="text-gray-400">N/A</span>
+        ),
+      sortable: true,
+      sortField: "seller.legalName",
+    },
+    {
+      name: "DESTINATION",
+      selector: (row: TContract) => row?.deliveryDestination || "",
+      width: "200px",
+      sortField: "deliveryDestination",
+    },
+    {
+      name: "CONTRACT PRICE",
+      selector: (row: TContract) => row?.priceExGST || 0,
+      sortable: true,
+      sortField: "priceExGST",
+    },
+    {
+      name: "STATUS",
+      selector: (row: TContract) => row?.status || "",
+      sortable: true,
+      sortField: "status",
+      width: "220px",
+      cell: (row: TContract) => {
+        const isEditing = editingStatusRowId === row._id;
+
+        return isEditing ? (
+          <div
+            className="flex items-center gap-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <select
+              value={tempStatus}
+              onChange={(e) => setTempStatus(e.target.value)} // ✅ FIX: Change this line
+              className="text-xs px-2 py-1 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoFocus
+            >
+              <option value="">Select status</option>
+              {ChangeStatusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => handleStatusSave(row._id!)}
+              disabled={updateStatusMutation.isPending}
+              className="p-1 cursor-pointer text-green-600 hover:bg-green-50 rounded"
+              title="Save"
+            >
+              <MdCheckCircle size={18} />
+            </button>
+            <button
+              onClick={handleStatusCancel}
+              disabled={updateStatusMutation.isPending}
+              className="p-1 text-red-600 cursor-pointer hover:bg-red-50 rounded"
+              title="Cancel"
+            >
+              <IoIosCloseCircle size={18} />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={(e) => handleStatusClick(row._id!, row.status || "", e)}
+            className="text-xs flex items-center gap-x-3 hover:bg-gray-100 px-3 py-1 rounded transition-colors w-full"
+          >
+            <RiCircleFill
+              className={`${
+                row.status?.toLowerCase() === "complete"
+                  ? "text-[#108A2B]"
+                  : row.status?.toLowerCase() === "invoiced" ||
+                      row.status?.toLowerCase() === "manually-invoiced"
+                    ? "text-[#3B82F6]"
+                    : row.status?.toLowerCase() === "draft"
+                      ? "text-[#EF4444]"
+                      : "text-[#FAD957]"
+              }`}
+            />
+            <span>{row.status?.replace("-", " ") || "Unknown"}</span>
+            <MdOutlineEdit
+              size={14}
+              className="ml-auto text-gray-400 cursor-pointer"
+            />
+          </button>
+        );
+      },
+    },
+    {
+      name: "NOTES",
+      selector: (row: TContract) => row.notes || "",
+    },
+  ];
 
   // Initialize pagination state with stored filters
   const getInitialPaginationState = (): PaginationState => {
@@ -279,7 +624,7 @@ const ContractManagementPage = () => {
   };
 
   const [paginationState, setPaginationState] = useState<PaginationState>(
-    getInitialPaginationState
+    getInitialPaginationState,
   );
 
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
@@ -364,7 +709,7 @@ const ContractManagementPage = () => {
             Invoice {isUpdate ? "updated" : "created"} successfully
           </p>
         </div>,
-        { duration: 5000 }
+        { duration: 5000 },
       );
     },
 
@@ -417,7 +762,7 @@ const ContractManagementPage = () => {
                   Please try creating the invoice again to reconnect.
                 </p>
               </div>,
-              { duration: 5000 }
+              { duration: 5000 },
             );
             return;
           }
@@ -439,7 +784,7 @@ const ContractManagementPage = () => {
                   Please click &quot;Create Invoice&quot; again to proceed.
                 </p>
               </div>,
-              { duration: 5000 }
+              { duration: 5000 },
             );
           } else {
             toast.error("Failed to verify Xero connection. Please try again.");
@@ -456,7 +801,7 @@ const ContractManagementPage = () => {
                   "Please try clicking 'Create Invoice' again."}
               </p>
             </div>,
-            { duration: 6000 }
+            { duration: 6000 },
           );
         }
       } else {
@@ -466,9 +811,13 @@ const ContractManagementPage = () => {
     },
   });
 
-    const areAllContractsInvoiced = (contracts: TContract[]): boolean => {
-    return contracts.length > 0 && 
-      contracts.every(contract => contract.status?.toLowerCase() === 'invoiced');
+  const areAllContractsInvoiced = (contracts: TContract[]): boolean => {
+    return (
+      contracts.length > 0 &&
+      contracts.every(
+        (contract) => contract.status?.toLowerCase() === "invoiced",
+      )
+    );
   };
   // Group contracts by invoice recipient (based on brokeragePayableBy)
   const groupContractsByInvoiceRecipient = (contracts: TContract[]) => {
@@ -526,7 +875,7 @@ const ContractManagementPage = () => {
         !contract?._id ||
         !allowedStatuses.includes(contract.status?.toLowerCase()) ||
         !contract.buyer?.name ||
-        !contract.buyer?.email
+        !contract.buyer?.email,
     );
 
     if (invalidContracts.length > 0) {
@@ -537,7 +886,7 @@ const ContractManagementPage = () => {
       }
 
       const invalidStatusContracts = invalidContracts.filter(
-        (c) => !allowedStatuses.includes(c.status?.toLowerCase())
+        (c) => !allowedStatuses.includes(c.status?.toLowerCase()),
       );
 
       if (invalidStatusContracts.length > 0) {
@@ -553,9 +902,9 @@ const ContractManagementPage = () => {
 
       toast.error(
         `Cannot create invoice: ${issues.join(
-          "; "
+          "; ",
         )}. Only completed or invoiced contracts can be invoiced.`,
-        { duration: 6000 }
+        { duration: 6000 },
       );
       return;
     }
@@ -566,16 +915,13 @@ const ContractManagementPage = () => {
     if (groupCount > 1) {
       toast.loading(
         `Selected contracts will be split into ${groupCount} separate invoices based on invoice recipient and payment terms.`,
-        { duration: 6000 }
+        { duration: 6000 },
       );
     }
 
     try {
       // Check current connection status
       const status = await getXeroConnectionStatus();
-
-      console.log("Xero Status:", status);
-
       // If not connected, automatically initiate connection
       if (!status.connected || !status.tenantName) {
         toast.loading("Connecting to Xero...");
@@ -592,8 +938,6 @@ const ContractManagementPage = () => {
           // Verify connection after authorization
           const newStatus = await getXeroConnectionStatus();
 
-          console.log("New Xero Status:", newStatus);
-
           setXeroStatus({
             isConnected: newStatus.connected,
             tenantName: newStatus.tenantName || null,
@@ -602,13 +946,13 @@ const ContractManagementPage = () => {
 
           if (!newStatus.connected || !newStatus.tenantName) {
             toast.error(
-              "Xero connection verification failed. Please try again."
+              "Xero connection verification failed. Please try again.",
             );
             return;
           }
 
           toast.success(
-            `Xero connected successfully to ${newStatus.tenantName}!`
+            `Xero connected successfully to ${newStatus.tenantName}!`,
           );
         } catch (error: any) {
           toast.dismiss();
@@ -629,6 +973,14 @@ const ContractManagementPage = () => {
       defaultDueDate.setDate(defaultDueDate.getDate() + 30);
 
       const firstContract = selectedRows[0];
+
+      // ✅ Use contract date as invoice date
+      const contractDate =
+        firstContract.contractDate || firstContract.createdAt;
+      const invoiceDate = contractDate
+        ? new Date(contractDate).toISOString().split("T")[0]
+        : new Date().toISOString().split("T")[0];
+
       const reference =
         selectedRows.length === 1
           ? `${firstContract.contractNumber} - ${firstContract.seller?.legalName}`
@@ -640,7 +992,7 @@ const ContractManagementPage = () => {
         .join("\n---\n");
 
       setInvoiceFormData({
-        invoiceDate: new Date().toISOString().split("T")[0],
+        invoiceDate: invoiceDate, // ✅ Set to contract date
         dueDate: defaultDueDate.toISOString().split("T")[0],
         reference: reference,
         notes: combinedNotes || "",
@@ -702,9 +1054,6 @@ const ContractManagementPage = () => {
     const contractGroups = groupContractsByInvoiceRecipient(selectedRows);
     const groupKeys = Object.keys(contractGroups);
 
-    console.log("Contract Groups:", contractGroups);
-    console.log("Number of invoices to create:", groupKeys.length);
-
     if (groupKeys.length === 1) {
       // Single invoice for all contracts (same recipient)
       const contracts = contractGroups[groupKeys[0]];
@@ -720,10 +1069,6 @@ const ContractManagementPage = () => {
         recipientType === "seller"
           ? firstContract.seller?.legalName
           : firstContract.buyer?.name;
-
-      console.log(
-        `Creating single invoice for ${contracts.length} contracts - ${recipientName}`
-      );
 
       createInvoiceMutation.mutate({
         contractIds: contracts.map((c) => c._id!),
@@ -760,10 +1105,6 @@ const ContractManagementPage = () => {
             contracts.length === 1
               ? `${contracts[0].contractNumber} - ${recipientName}`
               : `Brokerage Invoice - ${recipientName} (${contracts.length} contracts)`;
-
-          console.log(
-            `Creating invoice for ${contracts.length} contracts - ${recipientName}`
-          );
 
           return createXeroInvoice({
             contractIds: contracts.map((c) => c._id!),
@@ -815,7 +1156,7 @@ const ContractManagementPage = () => {
                 Please close this dialog and try again to reconnect.
               </p>
             </div>,
-            { duration: 5000 }
+            { duration: 5000 },
           );
 
           setXeroStatus({
@@ -833,7 +1174,7 @@ const ContractManagementPage = () => {
   // Track if search filters are active
   const [hasSearchFilters, setHasSearchFilters] = useState(
     Object.keys(paginationState.searchFilters).length > 0 &&
-      Object.values(paginationState.searchFilters).some((v) => v.trim() !== "")
+      Object.values(paginationState.searchFilters).some((v) => v.trim() !== ""),
   );
 
   // Handle search filter changes from AdvanceSearchFilter component
@@ -853,7 +1194,7 @@ const ContractManagementPage = () => {
       setSelectedRows([]);
       setToggleCleared((prev) => !prev);
     },
-    []
+    [],
   );
 
   // Set mounted state on client
@@ -970,7 +1311,7 @@ const ContractManagementPage = () => {
     selectedRows: TContract[];
   }) => {
     const validSelectedRows = selected.selectedRows.filter(
-      (row): row is TContract => row != null && row._id != null
+      (row): row is TContract => row != null && row._id != null,
     );
     setSelectedRows(validSelectedRows);
   };
@@ -1078,100 +1419,211 @@ const ContractManagementPage = () => {
       toast.error("Selected contract is invalid");
     }
   };
+  // Add this state with your other state declarations
+  const [contractDescriptions, setContractDescriptions] = useState<string[]>(
+    [],
+  );
 
+  const isValidEmail = (email: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  const addCustomRecipient = () => {
+    if (!newRecipientEmail.trim()) {
+      toast.error("Please enter an email address");
+      return;
+    }
+
+    if (!isValidEmail(newRecipientEmail)) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
+    // Check for duplicates
+    if (
+      emailRecipients.some(
+        (r) => r.email.toLowerCase() === newRecipientEmail.toLowerCase(),
+      )
+    ) {
+      toast.error("This email address is already in the recipient list");
+      return;
+    }
+
+    const newRecipient = {
+      id: `custom-${Date.now()}`,
+      email: newRecipientEmail.trim(),
+      name: newRecipientEmail.trim(),
+      isCustom: true,
+    };
+
+    setEmailRecipients([...emailRecipients, newRecipient]);
+    setNewRecipientEmail("");
+  };
+
+  const removeRecipient = (id: string) => {
+    setEmailRecipients(emailRecipients.filter((r) => r.id !== id));
+  };
+
+  // Updated handleEmail function
   const handleEmail = async (recipientType: "buyer" | "seller") => {
     if (selectedRows.length === 0) {
       toast.error(
-        `Please select at least one contract to email ${recipientType}`
+        `Please select at least one contract to email ${recipientType}`,
+      );
+      return;
+    }
+
+    const validRows = selectedRows.filter(
+      (row): row is TContract => row != null,
+    );
+
+    // Initialize recipients from contracts
+    const defaultRecipients = validRows
+      .filter((row) =>
+        recipientType === "buyer" ? row.buyer?.email : row.seller?.email,
+      )
+      .map((row, idx) => ({
+        id: `default-${idx}`,
+        email:
+          (recipientType === "buyer" ? row.buyer?.email : row.seller?.email) ||
+          "",
+        name:
+          (recipientType === "buyer"
+            ? row.buyer?.name
+            : row.seller?.legalName) || "",
+        isCustom: false,
+      }));
+
+    if (defaultRecipients.length === 0) {
+      toast.error(
+        `No valid ${recipientType} emails found in selected contracts`,
       );
       return;
     }
 
     try {
-      toast.loading("Generating PDF and preparing email...");
+      // Check Outlook connection
+      const { connected } = await getOutlookConnectionStatus();
 
-      const validRows = selectedRows.filter(
-        (row): row is TContract => row != null
-      );
-      const recipients = validRows
-        .map((row) =>
-          recipientType === "buyer" ? row.buyer?.email : row.seller?.email
-        )
-        .filter((email): email is string => Boolean(email));
+      if (!connected) {
+        toast.loading("Opening Outlook authorization...");
 
-      if (recipients.length === 0) {
-        toast.error(
-          `No valid ${recipientType} emails found in selected contracts`
-        );
+        try {
+          await initiateOutlookAuth();
+          toast.dismiss();
+          toast.success("Outlook connected successfully!");
+
+          // Initialize email modal with recipients
+          setEmailRecipientType(recipientType);
+          setEmailAdditionalText("");
+          setEmailRecipients(defaultRecipients);
+          setContractDescriptions(
+            validRows.map(
+              (contract) =>
+                `${contract.contractNumber} - ${contract.tonnes}mt ${contract.grade} (${contract.buyer?.name} ↔ ${contract.seller?.legalName})`,
+            ),
+          );
+          setIsEmailModalOpen(true);
+        } catch (authError: any) {
+          toast.dismiss();
+          toast.error(authError.message || "Failed to authorize Outlook");
+        }
         return;
       }
+
+      // Already connected - initialize email modal with recipients
+      setEmailRecipientType(recipientType);
+      setEmailAdditionalText("");
+      setEmailRecipients(defaultRecipients);
+      setContractDescriptions(
+        validRows.map(
+          (contract) =>
+            `${contract.contractNumber} - ${contract.tonnes}mt ${contract.grade} (${contract.buyer?.name} ↔ ${contract.seller?.legalName})`,
+        ),
+      );
+      setIsEmailModalOpen(true);
+    } catch (error: any) {
+      toast.dismiss();
+      toast.error(error.message || "Failed to verify Outlook connection");
+    }
+  };
+
+  // Helper functions for managing contract descriptions
+  const handleContractDescriptionChange = (index: number, value: string) => {
+    const newDescriptions = [...contractDescriptions];
+    newDescriptions[index] = value;
+    setContractDescriptions(newDescriptions);
+  };
+
+  const addCustomContract = () => {
+    setContractDescriptions([...contractDescriptions, ""]);
+  };
+
+  const removeContract = (index: number) => {
+    const newDescriptions = contractDescriptions.filter((_, i) => i !== index);
+    setContractDescriptions(newDescriptions);
+  };
+
+  // Updated confirmSendEmail function
+  const confirmSendEmail = async () => {
+    if (emailRecipients.length === 0) {
+      toast.error("Please add at least one recipient");
+      return;
+    }
+
+    if (contractDescriptions.filter((d) => d.trim()).length === 0) {
+      toast.error("Please add at least one contract description");
+      return;
+    }
+
+    try {
+      toast.loading("Generating PDF and sending email...");
+
+      const validRows = selectedRows.filter(
+        (row): row is TContract => row != null,
+      );
+
+      const recipients = emailRecipients.map((r) => r.email);
 
       const pdfBlob = await generatePDFBlobFromComponent(validRows);
 
       if (!pdfBlob) {
+        toast.dismiss();
         throw new Error("Failed to generate PDF");
       }
 
-      const filename = `contracts_${recipientType}_${Date.now()}.pdf`;
-      const cloudinaryResponse = await uploadPDFToCloudinary(pdfBlob, filename);
+      const response = await sendContractEmail({
+        recipients,
+        recipientType: emailRecipientType,
+        contracts: validRows,
+        contractDescriptions: contractDescriptions.filter((d) => d.trim()),
+        additionalText: emailAdditionalText,
+        pdf: pdfBlob,
+      });
 
-      let subject;
-      const contract = validRows[0];
-      if (recipientType === "seller" && validRows.length === 1) {
-        subject = `Broker Note - ${contract.contractNumber || ""} ${
-          contract.tonnes || 0
-        }mt ${contract.grade || ""} ${contract.deliveryOption || "Delivered"} ${
-          contract.deliveryDestination || ""
-        }`;
-      } else {
-        subject = `${validRows.length} Contract(s) - ${
-          recipientType === "buyer" ? "Buyer" : "Seller"
-        } Documents`;
+      toast.dismiss();
+
+      if (!response.success) {
+        throw new Error(response.message);
       }
 
-      const contractSummary = validRows
-        .map(
-          (contract) =>
-            `• ${contract.contractNumber} - ${contract.tonnes}mt ${contract.grade} (${contract.buyer?.name} ↔ ${contract.seller?.legalName})`
-        )
-        .join("\n");
-
-      const emailBody = `Dear ${
-        recipientType.charAt(0).toUpperCase() + recipientType.slice(1)
-      },
-
-Please find the contract document(s) attached below:
-
-${contractSummary}
-
-📎 Download PDF: ${cloudinaryResponse.secure_url}
-
-If you have any questions, please don't hesitate to contact us.
-
-Best regards,
-Growth Grain Services`;
-
-      const outlookLink = `mailto:${recipients.join(
-        ","
-      )}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(
-        emailBody
-      )}`;
-
-      toast.dismiss();
-      window.location.href = outlookLink;
-
       toast.success(
-        `Email prepared with PDF for ${recipients.length} ${recipientType}(s)`
+        `Email sent successfully to ${recipients.length} recipient(s)!`,
       );
-    } catch (error) {
+
+      setIsEmailModalOpen(false);
+      setEmailAdditionalText("");
+      setContractDescriptions([]);
+      setEmailRecipients([]);
+      setNewRecipientEmail("");
+    } catch (error: any) {
       toast.dismiss();
-      console.error("Error preparing email with PDF:", error);
-      toast.error("Failed to generate PDF and prepare email");
+      toast.error(error.message || "Failed to send email");
     }
   };
 
   const generatePDFBlobFromComponent = async (
-    contracts: TContract[]
+    contracts: TContract[],
   ): Promise<Blob | null> => {
     try {
       const { pdf } = await import("@react-pdf/renderer");
@@ -1180,7 +1632,7 @@ Growth Grain Services`;
       ).default;
 
       const blob = await pdf(
-        <ExportContractPdf contracts={contracts} />
+        <ExportContractPdf contracts={contracts} />,
       ).toBlob();
 
       return blob;
@@ -1190,35 +1642,6 @@ Growth Grain Services`;
     }
   };
 
-  const uploadPDFToCloudinary = async (
-    pdfBlob: Blob,
-    filename: string
-  ): Promise<any> => {
-    const formData = new FormData();
-    formData.append("file", pdfBlob, filename);
-    formData.append("resource_type", "raw");
-    formData.append(
-      "upload_preset",
-      process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET!
-    );
-
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_CLOUDINARY_URL}${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/raw/upload`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to upload PDF to Cloudinary: ${errorText}`);
-    }
-
-    return response.json();
-  };
-
-  // Prevent hydration mismatch
   if (!isMounted) {
     return (
       <div className="mt-20 flex justify-center items-center min-h-64">
@@ -1324,34 +1747,47 @@ Growth Grain Services`;
 
           {/* Action Buttons */}
           <div className="w-full md:w-auto lg:flex lg:flex-row gap-2 grid grid-cols-3">
-      <button
-        onClick={handleCreateInvoice}
-        disabled={
-          selectedRows.length === 0 ||
-          selectedRows[0]?.status?.toLowerCase() === "draft" ||
-          xeroStatus.isChecking
-        }
-        className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${
-          selectedRows.length > 0 &&
-          selectedRows[0]?.status?.toLowerCase() !== "draft" &&
-          !xeroStatus.isChecking
-            ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
-            : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
-        }`}
-      >
-        {xeroStatus.isChecking ? (
-          <>
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
-            Checking...
-          </>
-        ) : (
-          <>
-            <IoReceiptOutline />
-            {areAllContractsInvoiced(selectedRows) ? 'Update Invoice' : 'Create Invoice'}
-          </>
-        )}
-      </button>
-
+            <button
+              onClick={handleCreateInvoice}
+              disabled={
+                selectedRows.length === 0 ||
+                selectedRows[0]?.status?.toLowerCase() === "draft" ||
+                xeroStatus.isChecking
+              }
+              className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${
+                selectedRows.length > 0 &&
+                selectedRows[0]?.status?.toLowerCase() !== "draft" &&
+                !xeroStatus.isChecking
+                  ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
+                  : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
+              }`}
+            >
+              {xeroStatus.isChecking ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <IoReceiptOutline />
+                  {areAllContractsInvoiced(selectedRows)
+                    ? "Update Invoice"
+                    : "Create Invoice"}
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleBulkStatusUpdate}
+              disabled={selectedRows.length === 0}
+              className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${
+                selectedRows.length > 0
+                  ? "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 cursor-pointer"
+                  : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
+              }`}
+            >
+              <MdOutlineEdit />
+              Update Status
+            </button>
             <button
               onClick={handleDuplicate}
               className={`w-full md:w-auto px-3 py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${
@@ -1498,7 +1934,7 @@ Growth Grain Services`;
         </div>
 
         {/* DataTable with Server-side Pagination */}
-        <div className="overflow-x-auto border border-gray-300">
+        <div className="border border-gray-300">
           <DataTable
             columns={columns}
             data={contracts}
@@ -1662,7 +2098,7 @@ Growth Grain Services`;
                     <span className="ml-2 font-medium">
                       {new Date(
                         selectedRows[0]?.contractDate ||
-                          selectedRows[0]?.createdAt
+                          selectedRows[0]?.createdAt,
                       ).toLocaleDateString()}
                     </span>
                   </div>
@@ -1804,7 +2240,7 @@ Growth Grain Services`;
               >
                 Cancel
               </button>
-             <button
+              <button
                 onClick={confirmCreateInvoice}
                 disabled={
                   createInvoiceMutation.isPending || !invoiceFormData.dueDate
@@ -1814,12 +2250,343 @@ Growth Grain Services`;
                 {createInvoiceMutation.isPending ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    {areAllContractsInvoiced(selectedRows) ? 'Updating Invoice...' : 'Creating Invoice...'}
+                    {areAllContractsInvoiced(selectedRows)
+                      ? "Updating Invoice..."
+                      : "Creating Invoice..."}
                   </>
                 ) : (
                   <>
                     <MdCheckCircle />
-                    {areAllContractsInvoiced(selectedRows) ? 'Update Invoice in Xero' : 'Create Invoice in Xero'}
+                    {areAllContractsInvoiced(selectedRows)
+                      ? "Update Invoice in Xero"
+                      : "Create Invoice in Xero"}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Confirmation Modal */}
+      {isEmailModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold flex gap-x-3 items-center">
+                  <IoIosSend className="text-blue-600 text-2xl" />
+                  Send Email to{" "}
+                  {emailRecipientType === "buyer" ? "Buyer" : "Seller"}
+                </h3>
+                <button
+                  onClick={() => {
+                    setIsEmailModalOpen(false);
+                    setEmailAdditionalText("");
+                    setEmailRecipients([]);
+                    setNewRecipientEmail("");
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <IoIosCloseCircle size={28} />
+                </button>
+              </div>
+            </div>
+
+            <div className="px-6 py-4">
+              {/* Recipients Section */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-gray-800">
+                    Email Recipients ({emailRecipients.length})
+                  </h4>
+                </div>
+
+                {/* Recipient List */}
+                <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                  {emailRecipients.map((recipient) => (
+                    <div
+                      key={recipient.id}
+                      className="flex items-center justify-between bg-white p-3 rounded border border-gray-200"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{recipient.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {recipient.email}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {recipient.isCustom && (
+                          <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded">
+                            Custom
+                          </span>
+                        )}
+                        <button
+                          onClick={() => removeRecipient(recipient.id)}
+                          className="text-red-600 hover:text-red-800 transition-colors"
+                          title="Remove recipient"
+                        >
+                          <IoIosCloseCircle size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {emailRecipients.length === 0 && (
+                    <p className="text-sm text-gray-500 italic text-center py-4">
+                      No recipients added. Add a recipient below.
+                    </p>
+                  )}
+                </div>
+
+                {/* Add Recipient Form */}
+                <div className="border-t border-blue-200 pt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">
+                    Add Custom Recipient
+                  </p>
+                  <div className="flex gap-3">
+                    <input
+                      type="email"
+                      value={newRecipientEmail}
+                      onChange={(e) => setNewRecipientEmail(e.target.value)}
+                      onKeyPress={(e) =>
+                        e.key === "Enter" && addCustomRecipient()
+                      }
+                      placeholder="Enter email address"
+                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={addCustomRecipient}
+                      className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors whitespace-nowrap"
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contract Descriptions */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-gray-800">
+                    Contracts to be Sent ({contractDescriptions.length})
+                  </h4>
+                  <button
+                    onClick={addCustomContract}
+                    className="text-sm px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  >
+                    + Add Entry
+                  </button>
+                </div>
+                <div className="space-y-3 max-h-60 overflow-y-auto">
+                  {contractDescriptions.map((description, idx) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      <span className="text-gray-600 mt-2">•</span>
+                      <input
+                        type="text"
+                        value={description}
+                        onChange={(e) =>
+                          handleContractDescriptionChange(idx, e.target.value)
+                        }
+                        placeholder="Enter contract description..."
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        onClick={() => removeContract(idx)}
+                        className="text-red-600 hover:text-red-800 px-2 py-2 transition-colors"
+                        title="Remove"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  {contractDescriptions.length === 0 && (
+                    <p className="text-sm text-gray-500 italic text-center py-4">
+                      No contracts added. Click &quot;+ Add Entry&quot; to add a
+                      contract.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Additional Message Input */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Additional Message (Optional)
+                  </label>
+                  <textarea
+                    value={emailAdditionalText}
+                    onChange={(e) => setEmailAdditionalText(e.target.value)}
+                    placeholder="Add any additional message to include in the email body..."
+                    rows={5}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    This text will be added to the standard email template
+                    before the contract summary.
+                  </p>
+                </div>
+
+                {/* Email Preview */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-semibold text-gray-800 mb-2 text-sm">
+                    Email Preview
+                  </h4>
+                  <div className="text-sm text-gray-700 space-y-2 whitespace-pre-wrap">
+                    <p>
+                      Dear {emailRecipientType === "buyer" ? "Buyer" : "Seller"}
+                      ,
+                    </p>
+                    {emailAdditionalText && (
+                      <p className="bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
+                        {emailAdditionalText}
+                      </p>
+                    )}
+                    <p>Please find the contract document(s) attached.</p>
+                    <p className="text-xs text-gray-500 italic">
+                      [Contract summary will be included here]
+                    </p>
+                    <p>
+                      If you have any questions, please don&apos;t hesitate to
+                      contact us.
+                    </p>
+                    <p>
+                      Best regards,
+                      <br />
+                      Growth Grain Services
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 sticky bottom-0 bg-white">
+              <button
+                onClick={() => {
+                  setIsEmailModalOpen(false);
+                  setEmailAdditionalText("");
+                  setEmailRecipients([]);
+                  setNewRecipientEmail("");
+                }}
+                className="px-5 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSendEmail}
+                disabled={emailRecipients.length === 0}
+                className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+              >
+                <IoIosSend />
+                Send Email
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isBulkStatusModalOpen && (
+        <div
+          className={`fixed ${satoshiFont.className} inset-0 flex items-center justify-center z-50 bg-opacity-50`}
+        >
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-xl font-semibold flex gap-x-3 items-center">
+                <MdOutlineEdit className="text-purple-600 text-2xl" />
+                Update Contract Status
+              </h3>
+            </div>
+
+            <div className="px-6 py-4">
+              {/* Selected Contracts Info */}
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+                <h4 className="font-semibold text-gray-800 mb-2">
+                  Selected Contracts ({selectedRows.length})
+                </h4>
+                <div className="space-y-1 text-sm max-h-40 overflow-y-auto">
+                  {selectedRows.map((contract, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between text-gray-700"
+                    >
+                      <span>• {contract.contractNumber}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100">
+                        Current:{" "}
+                        {contract.status.replace("_", " ") || "Unknown"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status Selection */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    New Status *
+                  </label>
+                  <select
+                    value={bulkStatusValue}
+                    onChange={(e) => setBulkStatusValue(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    autoFocus
+                  >
+                    <option value="">Select new status</option>
+                    {updateStatusOptions.map((option) => (
+                      <option
+                        className={satoshiFont.className}
+                        key={option.value}
+                        value={option.value}
+                      >
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Warning Message */}
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <IoWarning className="text-yellow-600 text-lg flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-yellow-800">
+                      This will update the status of all {selectedRows.length}{" "}
+                      selected contract(s). This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setIsBulkStatusModalOpen(false);
+                  setBulkStatusValue("");
+                }}
+                disabled={bulkUpdateStatusMutation.isPending}
+                className="px-5 py-2 border border-gray-300 rounded-md hover:bg-gray-100 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmBulkStatusUpdate}
+                disabled={
+                  bulkUpdateStatusMutation.isPending || !bulkStatusValue
+                }
+                className="px-5 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+              >
+                {bulkUpdateStatusMutation.isPending ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <MdCheckCircle />
+                    Update Status
                   </>
                 )}
               </button>

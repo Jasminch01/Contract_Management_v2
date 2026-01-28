@@ -1,4 +1,8 @@
-import { FetchContractsParams, TContract, TUpdateContract } from "@/types/types";
+import {
+  FetchContractsParams,
+  TContract,
+  TUpdateContract,
+} from "@/types/types";
 import { instance } from "./api";
 import axios, { AxiosResponse } from "axios";
 
@@ -20,7 +24,6 @@ interface ContractsPaginatedResponse {
   data: TContract[];
 }
 
-
 export const fetchContracts = async (
   params: FetchContractsParams = {}
 ): Promise<ContractsPaginatedResponse> => {
@@ -33,10 +36,9 @@ export const fetchContracts = async (
       }
     });
 
-    const response: AxiosResponse<ContractsPaginatedResponse> = await instance.get(
-      `contracts?${queryParams.toString()}`
-    );
-    console.log(response.data)
+    const response: AxiosResponse<ContractsPaginatedResponse> =
+      await instance.get(`contracts?${queryParams.toString()}`);
+
     return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -73,10 +75,9 @@ export const updateContract = async (
   updatedContract: TUpdateContract,
   id: string
 ): Promise<TContract> => {
-  // Replace 'any' with your actual contract response type
   try {
     const response = await instance.put(`/contracts/${id}`, updatedContract);
-    return response.data; // Return the actual data, not the full axios response
+    return response.data;
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error("Axios error update contract:", error.message);
@@ -85,6 +86,34 @@ export const updateContract = async (
     }
     // Throw the error so React Query can handle it properly
     throw error;
+  }
+};
+
+// Bulk update contract status
+export const bulkUpdateContractStatus = async (
+  contractIds: string[],
+  status: string
+): Promise<{
+  message: string;
+  modifiedCount: number;
+  contracts: TContract[];
+}> => {
+  try {
+    const response = await instance.put("/contracts/bulk-update-status", {
+      contractIds,
+      status,
+    });
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      console.error("Axios error bulk update status:", error.message);
+      throw new Error(
+        error.response?.data?.message || "Failed to update contract status"
+      );
+    } else {
+      console.error("Unexpected error bulk update status:", error);
+      throw error;
+    }
   }
 };
 
