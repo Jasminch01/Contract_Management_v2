@@ -1423,7 +1423,8 @@ const ContractManagementPage = () => {
   const [contractDescriptions, setContractDescriptions] = useState<string[]>(
     [],
   );
-
+  const [emailSubject, setEmailSubject] = useState("");
+  console.log(emailSubject);
   const isValidEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   };
@@ -1513,10 +1514,16 @@ const ContractManagementPage = () => {
           toast.dismiss();
           toast.success("Outlook connected successfully!");
 
-          // Initialize email modal with recipients
+          // Initialize email modal with default subject based on selected contracts
+          const defaultSubject =
+            validRows.length === 1
+              ? `Broker Note - ${validRows[0].contractNumber || ""} ${validRows[0].tonnes || 0}mt ${validRows[0].grade || ""} ${validRows[0].deliveryOption || "Delivered"} ${validRows[0].deliveryDestination || ""}`
+              : `${validRows.length} Contract(s) - ${recipientType === "buyer" ? "Buyer" : "Seller"} Documents`;
+
           setEmailRecipientType(recipientType);
           setEmailAdditionalText("");
           setEmailRecipients(defaultRecipients);
+          setEmailSubject(defaultSubject); // Set default subject
           setContractDescriptions(
             validRows.map(
               (contract) =>
@@ -1531,10 +1538,16 @@ const ContractManagementPage = () => {
         return;
       }
 
-      // Already connected - initialize email modal with recipients
+      // Already connected - initialize email modal with default subject
+      const defaultSubject =
+        validRows.length === 1
+          ? `Broker Note - ${validRows[0].contractNumber || ""} ${validRows[0].tonnes || 0}mt ${validRows[0].grade || ""} ${validRows[0].deliveryOption || "Delivered"} ${validRows[0].deliveryDestination || ""}`
+          : `${validRows.length} Contract(s) - ${recipientType === "buyer" ? "Buyer" : "Seller"} Documents`;
+
       setEmailRecipientType(recipientType);
       setEmailAdditionalText("");
       setEmailRecipients(defaultRecipients);
+      setEmailSubject(defaultSubject); // Set default subject
       setContractDescriptions(
         validRows.map(
           (contract) =>
@@ -1571,6 +1584,11 @@ const ContractManagementPage = () => {
       return;
     }
 
+    if (!emailSubject.trim()) {
+      toast.error("Please enter an email subject");
+      return;
+    }
+
     if (contractDescriptions.filter((d) => d.trim()).length === 0) {
       toast.error("Please add at least one contract description");
       return;
@@ -1598,6 +1616,7 @@ const ContractManagementPage = () => {
         contracts: validRows,
         contractDescriptions: contractDescriptions.filter((d) => d.trim()),
         additionalText: emailAdditionalText,
+        customSubject: emailSubject, // Send the subject
         pdf: pdfBlob,
       });
 
@@ -1616,6 +1635,7 @@ const ContractManagementPage = () => {
       setContractDescriptions([]);
       setEmailRecipients([]);
       setNewRecipientEmail("");
+      setEmailSubject(""); // Reset subject
     } catch (error: any) {
       toast.dismiss();
       toast.error(error.message || "Failed to send email");
@@ -2269,6 +2289,7 @@ const ContractManagementPage = () => {
       )}
 
       {/* Email Confirmation Modal */}
+
       {isEmailModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-opacity-50">
           <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -2286,6 +2307,7 @@ const ContractManagementPage = () => {
                     setEmailAdditionalText("");
                     setEmailRecipients([]);
                     setNewRecipientEmail("");
+                    setEmailSubject("");
                   }}
                   className="text-gray-400 hover:text-gray-600 transition-colors"
                 >
@@ -2295,6 +2317,23 @@ const ContractManagementPage = () => {
             </div>
 
             <div className="px-6 py-4">
+              {/* Email Subject Section */}
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-gray-800">Email Subject</h4>
+                </div>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  placeholder="Enter email subject line"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  This will be used as the email subject line
+                </p>
+              </div>
+
               {/* Recipients Section */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <div className="flex items-center justify-between mb-3">
@@ -2423,8 +2462,7 @@ const ContractManagementPage = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    This text will be added to the standard email template
-                    before the contract summary.
+                    This text will be added to the standard email template.
                   </p>
                 </div>
 
@@ -2435,22 +2473,32 @@ const ContractManagementPage = () => {
                   </h4>
                   <div className="text-sm text-gray-700 space-y-2 whitespace-pre-wrap">
                     <p>
+                      <strong>Subject:</strong>{" "}
+                      {emailSubject || "(No subject entered)"}
+                    </p>
+                    <hr className="my-2" />
+                    <p>
                       Dear {emailRecipientType === "buyer" ? "Buyer" : "Seller"}
                       ,
                     </p>
+                    <p>Please find attached the contract information.</p>
+                    <div className="bg-blue-50 p-2 rounded border-l-4 border-blue-400">
+                      {contractDescriptions.filter((d) => d.trim()).length >
+                      0 ? (
+                        contractDescriptions
+                          .filter((d) => d.trim())
+                          .map((desc, idx) => <p key={idx}>• {desc}</p>)
+                      ) : (
+                        <p className="text-gray-500 italic">
+                          [Contract descriptions will appear here]
+                        </p>
+                      )}
+                    </div>
                     {emailAdditionalText && (
                       <p className="bg-yellow-50 p-2 rounded border-l-4 border-yellow-400">
                         {emailAdditionalText}
                       </p>
                     )}
-                    <p>Please find the contract document(s) attached.</p>
-                    <p className="text-xs text-gray-500 italic">
-                      [Contract summary will be included here]
-                    </p>
-                    <p>
-                      If you have any questions, please don&apos;t hesitate to
-                      contact us.
-                    </p>
                     <p>
                       Best regards,
                       <br />
@@ -2469,6 +2517,7 @@ const ContractManagementPage = () => {
                   setEmailAdditionalText("");
                   setEmailRecipients([]);
                   setNewRecipientEmail("");
+                  setEmailSubject("");
                 }}
                 className="px-5 py-2 border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
               >
@@ -2476,7 +2525,7 @@ const ContractManagementPage = () => {
               </button>
               <button
                 onClick={confirmSendEmail}
-                disabled={emailRecipients.length === 0}
+                disabled={emailRecipients.length === 0 || !emailSubject.trim()}
                 className="px-5 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
               >
                 <IoIosSend />

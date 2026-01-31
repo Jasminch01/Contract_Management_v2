@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { TContract } from "@/types/types";
 import { instance } from "./api";
 
 interface OutlookStatusResponse {
@@ -83,14 +84,14 @@ export const initiateOutlookAuth = (): Promise<boolean> => {
 };
 
 // Updated interfaces
-interface SendContractEmailRequest {
-  recipients: string[];
-  recipientType: "buyer" | "seller";
-  contracts: any[];
-  contractDescriptions: string[]; // Add this field
-  additionalText: string;
-  pdf: Blob;
-}
+// interface SendContractEmailRequest {
+//   recipients: string[];
+//   recipientType: "buyer" | "seller";
+//   contracts: any[];
+//   contractDescriptions: string[]; // Add this field
+//   additionalText: string;
+//   pdf: Blob;
+// }
 
 interface SendContractEmailResponse {
   success: boolean;
@@ -98,6 +99,52 @@ interface SendContractEmailResponse {
 }
 
 // Updated API function
+// export const sendContractEmail = async (
+//   data: SendContractEmailRequest
+// ): Promise<SendContractEmailResponse> => {
+//   try {
+//     const formData = new FormData();
+//     formData.append(
+//       "pdf",
+//       data.pdf,
+//       `contracts_${data.recipientType}_${Date.now()}.pdf`
+//     );
+//     formData.append("recipients", JSON.stringify(data.recipients));
+//     formData.append("recipientType", data.recipientType);
+//     formData.append("contracts", JSON.stringify(data.contracts));
+//     formData.append("contractDescriptions", JSON.stringify(data.contractDescriptions)); // Add this
+//     formData.append("additionalText", data.additionalText || "");
+
+//     const response = await instance.post<SendContractEmailResponse>(
+//       "/outlook/send",
+//       formData,
+//       {
+//         headers: {
+//           "Content-Type": "multipart/form-data",
+//         },
+//       }
+//     );
+
+//     return response.data;
+//   } catch (error: any) {
+//     throw new Error(
+//       error.response?.data?.message || error.message || "Failed to send email"
+//     );
+//   }
+// };
+
+
+interface SendContractEmailRequest {
+  recipients: string[];
+  recipientType: "buyer" | "seller";
+  contracts: TContract[];
+  contractDescriptions: string[];
+  additionalText?: string;
+  customSubject?: string; // Add this line
+  pdf: Blob;
+}
+
+
 export const sendContractEmail = async (
   data: SendContractEmailRequest
 ): Promise<SendContractEmailResponse> => {
@@ -111,8 +158,9 @@ export const sendContractEmail = async (
     formData.append("recipients", JSON.stringify(data.recipients));
     formData.append("recipientType", data.recipientType);
     formData.append("contracts", JSON.stringify(data.contracts));
-    formData.append("contractDescriptions", JSON.stringify(data.contractDescriptions)); // Add this
+    formData.append("contractDescriptions", JSON.stringify(data.contractDescriptions));
     formData.append("additionalText", data.additionalText || "");
+    formData.append("customSubject", data.customSubject || ""); // Add this line
 
     const response = await instance.post<SendContractEmailResponse>(
       "/outlook/send",
