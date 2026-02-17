@@ -83,6 +83,8 @@ export const initiateOutlookAuth = (): Promise<boolean> => {
   });
 };
 
+
+
 // Updated interfaces
 // interface SendContractEmailRequest {
 //   recipients: string[];
