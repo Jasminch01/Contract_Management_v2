@@ -453,15 +453,15 @@ const SellerInformationEditPage = () => {
       return;
     }
 
-    const contactExists = sellerData?.contactName.some(
-      (contact) =>
-        contact.email.toLowerCase() === newContact.email.toLowerCase()
-    );
+    // const contactExists = sellerData?.contactName.some(
+    //   (contact) =>
+    //     contact.email.toLowerCase() === newContact.email.toLowerCase()
+    // );
 
-    if (contactExists) {
-      toast.error("Contact email already exists");
-      return;
-    }
+    // if (contactExists) {
+    //   toast.error("Contact email already exists");
+    //   return;
+    // }
 
     setSellerData((prev) => {
       if (!prev) return prev;
