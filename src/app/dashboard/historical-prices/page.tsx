@@ -207,8 +207,12 @@ const getSeasonFromDate = (date: Date) => {
   const year = date.getFullYear();
   
   // Each season represents a full year
-  const startYear = year;
-  const endYear = year + 1;
+  // const startYear = year;
+  // const endYear = year + 1;
+
+  //season coustomized the current seasone is 25/26 the acual function is top
+  const startYear = year -1;
+  const endYear = year;
   return `${String(startYear).slice(-2)}/${String(endYear).slice(-2)}`;
 };
 
