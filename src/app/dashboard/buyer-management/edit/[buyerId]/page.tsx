@@ -9,7 +9,7 @@ import {
   MdDelete,
   MdAdd,
 } from "react-icons/md";
-import toast from "react-hot-toast";
+import toast, { Toaster } from "react-hot-toast";
 import { getBuyer, updateBuyer } from "@/api/buyerApi";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -185,14 +185,14 @@ const BuyerInformationEditPage = () => {
     }
 
     // Check if contact name already exists
-    const contactExists = buyerData.contacts.some(
-      (contact) => contact.name.toLowerCase() === newContact.name.toLowerCase()
-    );
+    // const contactExists = buyerData.contacts.some(
+    //   (contact) => contact.name.toLowerCase() === newContact.name.toLowerCase()
+    // );
 
-    if (contactExists) {
-      toast.error("Contact name already exists");
-      return;
-    }
+    // if (contactExists) {
+    //   toast.error("Contact name already exists");
+    //   return;
+    // }
 
     setBuyerData((prev) => {
       if (!prev) return null;
@@ -281,6 +281,7 @@ const BuyerInformationEditPage = () => {
 
   return (
     <div className="pb-10">
+      <Toaster/>
       <div className="border-b border-gray-300 py-10">
         <div className="mx-auto max-w-6xl flex items-center gap-5">
           <button type="button" onClick={handleBack} className="cursor-pointer">
