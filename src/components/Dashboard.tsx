@@ -1,14 +1,14 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 //@ts-nocheck
 "use client";
-import { exportDatabaseCSV } from "@/api/exportApi";
+// import { exportDatabaseCSV } from "@/api/exportApi";
 import ContractProgress from "./Dashboard/ContractProgress";
 import HistoricalDailyCommision from "./Dashboard/HistoricalDailyCommision";
 import HistoricalPrices from "./Dashboard/HistoricalPrices";
 import HistoycalNotebooks from "./Dashboard/HistoycalNotebooks";
 import { getSummeryReport, getHistoricalReport } from "@/api/dashboardApi";
 import { useQuery } from "@tanstack/react-query";
-import { FiDownload } from "react-icons/fi";
+// import { FiDownload } from "react-icons/fi";
 
 // Skeleton Card Component
 const SkeletonCard = () => (
@@ -158,14 +158,14 @@ const Dashboard = () => {
       <div className="">
         <div className="flex justify-between">
           <p className="font-bold text-xl mb-10">Dashboard</p>
-          <div>
+          {/* <div>
             <button
               onClick={exportDatabaseCSV}
               className="cursor-pointer px-3 py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors "
             >
               <FiDownload /> Export All Data
             </button>
-          </div>
+          </div> */}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-5">
           {/* Card 1 */}
