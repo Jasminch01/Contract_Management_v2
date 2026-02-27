@@ -360,7 +360,7 @@ const HistoricalPricesPage = () => {
 
     if (!selectedSeason) {
       const currentSeason = getCurrentSeason();
-      setSelectedSeason(customCurrentSeason);
+      setSelectedSeason(customCurrentSeason || currentSeason);
     }
   }, []);
 
