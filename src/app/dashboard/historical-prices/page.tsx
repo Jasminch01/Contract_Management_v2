@@ -170,52 +170,51 @@ const months = [
   "December",
 ];
 
-  const getFormattedSeasons = () => {
-    if (typeof window === "undefined") {
-      // Return empty array during SSR to avoid hydration mismatch
-      return [];
+const getFormattedSeasons = () => {
+  if (typeof window === "undefined") {
+    // Return empty array during SSR to avoid hydration mismatch
+    return [];
+  }
+
+  // This gets the current year every time the function is called
+  // So it automatically updates when the year changes
+  const currentYear = new Date().getFullYear();
+
+  // Generate seasons: 1 future season + current season + previous seasons back to 2021/2022
+  // But filter out any seasons below 2021/2022
+  const seasons = [];
+
+  // Start from next year (future season) and go backwards
+  for (let i = 0; i < 20; i++) {
+    // 20 is a safe upper limit to ensure we capture all needed seasons
+    const startYear = currentYear + 1 - i; // +1 for future season, then go backwards
+    const endYear = startYear + 1;
+
+    // Stop if we go below 2021/2022 season
+    if (startYear < 2021) {
+      break;
     }
 
-    // This gets the current year every time the function is called
-    // So it automatically updates when the year changes
-    const currentYear = new Date().getFullYear();
+    seasons.push(`${String(startYear).slice(-2)}/${String(endYear).slice(-2)}`);
+  }
 
-    // Generate seasons: 1 future season + current season + previous seasons back to 2021/2022
-    // But filter out any seasons below 2021/2022
-    const seasons = [];
-
-    // Start from next year (future season) and go backwards
-    for (let i = 0; i < 20; i++) {
-      // 20 is a safe upper limit to ensure we capture all needed seasons
-      const startYear = currentYear + 1 - i; // +1 for future season, then go backwards
-      const endYear = startYear + 1;
-
-      // Stop if we go below 2021/2022 season
-      if (startYear < 2021) {
-        break;
-      }
-
-      seasons.push(`${String(startYear).slice(-2)}/${String(endYear).slice(-2)}`);
-    }
-
-    return seasons;
-  };
+  return seasons;
+};
 
 const getSeasonFromDate = (date: Date) => {
   // This will always use the year from the provided date
   // So it automatically works for any year
   const year = date.getFullYear();
-  
+
   // Each season represents a full year
-  // const startYear = year;
-  // const endYear = year + 1;
+  const startYear = year;
+  const endYear = year + 1;
 
   //season coustomized the current seasone is 25/26 the acual function is top
-  const startYear = year -1;
-  const endYear = year;
+  // const startYear = year - 1;
+  // const endYear = year;
   return `${String(startYear).slice(-2)}/${String(endYear).slice(-2)}`;
 };
-
 
 const getCurrentDateInputValue = () => {
   if (typeof window === "undefined") {
@@ -249,7 +248,7 @@ const formatDateForFilename = (dateStr: string) => {
 
 // Create empty Port Zone table rows with static labels
 const createEmptyPortZoneRows = (
-  fetchedData: PortZoneBid[] = []
+  fetchedData: PortZoneBid[] = [],
 ): PortZoneTableRow[] => {
   return portZoneLabels.map((label, index) => {
     const existingData = fetchedData.find((bid) => bid.label === label);
@@ -279,12 +278,12 @@ const createEmptyPortZoneRows = (
 
 // Create empty Delivered Bids table rows with client locations
 const createEmptyDeliveredBidsRows = (
-  fetchedData: any[] = []
+  fetchedData: any[] = [],
 ): DeliveredBidTableRow[] => {
   return clientLocations.map((location, index) => {
     const existingData = fetchedData.find(
       (bid) =>
-        (bid as any).label === location || (bid as any).location === location
+        (bid as any).label === location || (bid as any).location === location,
     );
 
     const getMonthValue = (monthName: string) => {
@@ -336,6 +335,18 @@ const HistoricalPricesPage = () => {
 
   const [isMounted, setIsMounted] = useState(false);
 
+  // Add this state
+  const [customCurrentSeason, setCustomCurrentSeason] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem("customCurrentSeason") || getCurrentSeason();
+  });
+
+  // Update handler when user wants to mark a season as "current"
+  const handleSetAsCurrentSeason = (season: string) => {
+    setCustomCurrentSeason(season);
+    localStorage.setItem("customCurrentSeason", season);
+  };
+
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -349,7 +360,7 @@ const HistoricalPricesPage = () => {
 
     if (!selectedSeason) {
       const currentSeason = getCurrentSeason();
-      setSelectedSeason(currentSeason);
+      setSelectedSeason(customCurrentSeason);
     }
   }, []);
 
@@ -441,7 +452,7 @@ const HistoricalPricesPage = () => {
   const handlePortZoneDataChange = (
     updatedRow: PortZoneTableRow,
     grainType: string,
-    value: number | null
+    value: number | null,
   ) => {
     const bidData = {
       label: updatedRow.label as PortZoneBid["label"],
@@ -463,7 +474,7 @@ const HistoricalPricesPage = () => {
   const handleDeliveredBidsDataChange = (
     updatedRow: DeliveredBidTableRow,
     month: string,
-    value: number | null
+    value: number | null,
   ) => {
     const capitalizedMonth = month.charAt(0).toUpperCase() + month.slice(1);
 
@@ -513,7 +524,6 @@ const HistoricalPricesPage = () => {
     }-${startFormatted}-to-${endFormatted}.csv`;
 
     toast.success(`Exporting data from ${startFormatted} to ${endFormatted}`);
-
   };
 
   const handleDateChange = (newDate: string) => {
@@ -553,7 +563,7 @@ const HistoricalPricesPage = () => {
         <p className="text-xl">Historical Daily Prices</p>
         {isMounted && (
           <p className="text-sm text-gray-600 mt-2">
-            Current Season: {getCurrentSeason()}
+            Current Season: {customCurrentSeason}
           </p>
         )}
       </div>
@@ -615,7 +625,7 @@ const HistoricalPricesPage = () => {
                   <div className="px-3 py-2 text-xs text-gray-500 border-b border-gray-200">
                     Season
                   </div>
-                  {getFormattedSeasons().map((season, index) => {
+                  {/* {getFormattedSeasons().map((season, index) => {
                     const isCurrentSeason = season === getCurrentSeason();
                     const isSelectedSeason = season === selectedSeason;
 
@@ -628,6 +638,33 @@ const HistoricalPricesPage = () => {
                         onClick={() => handleSeasonChange(season)}
                       >
                         {season}
+                      </div>
+                    );
+                  })} */}
+                  {getFormattedSeasons().map((season, index) => {
+                    const isCurrentSeason = season === customCurrentSeason; // ✅ use custom
+                    const isSelectedSeason = season === selectedSeason;
+
+                    return (
+                      <div
+                        key={index}
+                        className={`flex items-center justify-between px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm ${isSelectedSeason ? "bg-blue-100 font-medium" : ""}`}
+                      >
+                        <span onClick={() => handleSeasonChange(season)}>
+                          {season}
+                        </span>
+
+                        {/* ✅ Star button to mark as current season */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleSetAsCurrentSeason(season);
+                          }}
+                          title="Set as current season"
+                          className={`text-sm cursor-pointer ml-2 ${isCurrentSeason ? "text-yellow-500" : "text-gray-300 hover:text-yellow-400"}`}
+                        >
+                          ★
+                        </button>
                       </div>
                     );
                   })}
