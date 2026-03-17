@@ -970,7 +970,7 @@ const ContractManagementPage = () => {
 
       // Prepare invoice form data
       const defaultDueDate = new Date();
-      defaultDueDate.setDate(defaultDueDate.getDate() + 30);
+      defaultDueDate.setDate(defaultDueDate.getDate() + 14); // Default due date 14 days from now
 
       const firstContract = selectedRows[0];
 
