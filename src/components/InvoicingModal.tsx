@@ -20,6 +20,18 @@ export interface InvoiceFormData {
   notes: string;
 }
 
+// Helper function to calculate due date with proper month/year handling
+const calculateDueDate = (invoiceDateStr: string, daysOffset: number): string => {
+  const invoiceDate = new Date(invoiceDateStr);
+  const dueDate = new Date(invoiceDate);
+  
+  // Add days - JavaScript Date automatically handles month/year boundaries
+  // (e.g., Jan 31 + 14 days = Feb 14, Dec 25 + 14 days = Jan 8 of next year)
+  dueDate.setDate(dueDate.getDate() + daysOffset);
+  
+  return dueDate.toISOString().split("T")[0];
+};
+
 const XeroInvoiceModal: React.FC<XeroInvoiceModalProps> = ({
   isOpen,
   onClose,
@@ -38,14 +50,12 @@ const XeroInvoiceModal: React.FC<XeroInvoiceModalProps> = ({
   // Initialize form data when contract changes
   useEffect(() => {
     if (contract) {
-      // Set default due date (14 days from invoice date)
-      const defaultDueDate = new Date();
-      defaultDueDate.setDate(defaultDueDate.getDate() + 14);
-
+      const todayStr = new Date().toISOString().split("T")[0];
+      
       setFormData({
         contractId: contract._id || "",
-        invoiceDate: new Date().toISOString().split("T")[0],
-        dueDate: defaultDueDate.toISOString().split("T")[0],
+        invoiceDate: todayStr,
+        dueDate: calculateDueDate(todayStr, 14),
         reference: `${contract.contractNumber} - ${contract.seller?.legalName}`,
         notes: contract.notes || "",
       });
@@ -54,12 +64,9 @@ const XeroInvoiceModal: React.FC<XeroInvoiceModalProps> = ({
 
   // Auto-update due date when invoice date changes
   useEffect(() => {
-    const invoiceDateObj = new Date(formData.invoiceDate);
-    const newDueDate = new Date(invoiceDateObj);
-    newDueDate.setDate(newDueDate.getDate() + 14);
     setFormData((prev) => ({
       ...prev,
-      dueDate: newDueDate.toISOString().split("T")[0],
+      dueDate: calculateDueDate(prev.invoiceDate, 14),
     }));
   }, [formData.invoiceDate]);
 
