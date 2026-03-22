@@ -38,9 +38,9 @@ const XeroInvoiceModal: React.FC<XeroInvoiceModalProps> = ({
   // Initialize form data when contract changes
   useEffect(() => {
     if (contract) {
-      // Set default due date (30 days from invoice date)
+      // Set default due date (14 days from invoice date)
       const defaultDueDate = new Date();
-      defaultDueDate.setDate(defaultDueDate.getDate() + 30);
+      defaultDueDate.setDate(defaultDueDate.getDate() + 14);
 
       setFormData({
         contractId: contract._id || "",
@@ -51,6 +51,17 @@ const XeroInvoiceModal: React.FC<XeroInvoiceModalProps> = ({
       });
     }
   }, [contract]);
+
+  // Auto-update due date when invoice date changes
+  useEffect(() => {
+    const invoiceDateObj = new Date(formData.invoiceDate);
+    const newDueDate = new Date(invoiceDateObj);
+    newDueDate.setDate(newDueDate.getDate() + 14);
+    setFormData((prev) => ({
+      ...prev,
+      dueDate: newDueDate.toISOString().split("T")[0],
+    }));
+  }, [formData.invoiceDate]);
 
   // Reset form on close
   const handleClose = () => {
