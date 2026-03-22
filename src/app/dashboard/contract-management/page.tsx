@@ -140,6 +140,18 @@ const ChangeStatusOptions = [
 
 const rowsPerPageOptions = [10, 25, 50, 100];
 
+// Helper function to calculate due date with proper month/year handling
+const calculateDueDate = (invoiceDateStr: string, daysOffset: number): string => {
+  const invoiceDate = new Date(invoiceDateStr);
+  const dueDate = new Date(invoiceDate);
+  
+  // Add days - JavaScript Date automatically handles month/year boundaries
+  // (e.g., Jan 31 + 14 days = Feb 14, Dec 25 + 14 days = Jan 8 of next year)
+  dueDate.setDate(dueDate.getDate() + daysOffset);
+  
+  return dueDate.toISOString().split("T")[0];
+};
+
 const ContractManagementPage = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -644,6 +656,7 @@ const ContractManagementPage = () => {
     tenantName: null,
     isChecking: false,
   });
+
   // Save filters to localStorage whenever pagination state changes
   useEffect(() => {
     if (isMounted) {
@@ -969,9 +982,6 @@ const ContractManagementPage = () => {
       }
 
       // Prepare invoice form data
-      const defaultDueDate = new Date();
-      defaultDueDate.setDate(defaultDueDate.getDate() + 14); // Default due date 14 days from now
-
       const firstContract = selectedRows[0];
 
       // ✅ Use contract date as invoice date
@@ -993,7 +1003,7 @@ const ContractManagementPage = () => {
 
       setInvoiceFormData({
         invoiceDate: invoiceDate, // ✅ Set to contract date
-        dueDate: defaultDueDate.toISOString().split("T")[0],
+        dueDate: calculateDueDate(invoiceDate, 14), // ✅ Auto-calculated 14 days after invoice date
         reference: reference,
         notes: combinedNotes || "",
       });
@@ -2165,12 +2175,14 @@ const ContractManagementPage = () => {
                     <input
                       type="date"
                       value={invoiceFormData.invoiceDate}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const newInvoiceDate = e.target.value;
                         setInvoiceFormData((prev) => ({
                           ...prev,
-                          invoiceDate: e.target.value,
-                        }))
-                      }
+                          invoiceDate: newInvoiceDate,
+                          dueDate: calculateDueDate(newInvoiceDate, 14),
+                        }));
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
