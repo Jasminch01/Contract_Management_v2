@@ -714,16 +714,52 @@ const ContractManagementPage = () => {
       setSelectedRows([]);
       setToggleCleared((prev) => !prev);
 
-      // Check if it was an update or creation
-      const isUpdate = response?.isUpdate || false;
-      toast.success(
-        <div>
-          <p className="font-semibold">
-            Invoice {isUpdate ? "updated" : "created"} successfully
-          </p>
-        </div>,
-        { duration: 5000 },
-      );
+      // Handle split invoices (Buyer & Seller brokerage)
+      const splitDetails = response?.splitDetails;
+      if (response?.splitInvoices && splitDetails && splitDetails.length > 0) {
+        toast.success(
+          <div>
+            <p className="font-semibold">
+              {splitDetails.length} Draft Invoices Created in Xero
+            </p>
+            <p className="text-sm mt-1 text-gray-600">
+              Brokerage was split between seller and buyer:
+            </p>
+            <ul className="text-sm mt-1 space-y-1">
+              {splitDetails.map(
+                (
+                  detail: {
+                    recipientType: string;
+                    recipientName: string;
+                    invoiceNumber: string;
+                  },
+                  i: number,
+                ) => (
+                  <li key={i}>
+                    <span className="font-medium capitalize">
+                      {detail.recipientType}
+                    </span>{" "}
+                    — {detail.recipientName}
+                    {detail.invoiceNumber && ` (${detail.invoiceNumber})`}
+                  </li>
+                ),
+              )}
+            </ul>
+          </div>,
+          { duration: 8000 },
+        );
+      } else {
+        // Standard single invoice
+        const isUpdate = response?.isUpdate || false;
+        toast.success(
+          <div>
+            <p className="font-semibold">
+              Invoice {isUpdate ? "updated" : "created"} successfully
+            </p>
+          </div>,
+          { duration: 5000 },
+        );
+      }
     },
 
     onError: async (error: any) => {
@@ -867,7 +903,6 @@ const ContractManagementPage = () => {
       if (!groups[recipientKey]) {
         groups[recipientKey] = [];
       }
-
       groups[recipientKey].push(contract);
     });
 
@@ -920,6 +955,50 @@ const ContractManagementPage = () => {
         { duration: 6000 },
       );
       return;
+    }
+
+    // ✅ NEW: If multiple contracts selected, validate they all belong to the same seller
+    if (selectedRows.length > 1) {
+      const firstSellerEmail =
+        selectedRows[0]?.seller?.email?.toLowerCase().trim() || "";
+      const firstSellerName =
+        selectedRows[0]?.seller?.legalName?.toLowerCase().trim() || "";
+
+      const differentSellers = selectedRows.filter((contract) => {
+        const sellerEmail =
+          contract.seller?.email?.toLowerCase().trim() || "";
+        const sellerName =
+          contract.seller?.legalName?.toLowerCase().trim() || "";
+
+        // Match by email (preferred) or by legal name
+        if (firstSellerEmail && sellerEmail) {
+          return sellerEmail !== firstSellerEmail;
+        }
+        return sellerName !== firstSellerName;
+      });
+
+      if (differentSellers.length > 0) {
+        const sellerNames = [
+          ...new Set(
+            selectedRows.map(
+              (c) => c.seller?.legalName || c.seller?.email || "Unknown",
+            ),
+          ),
+        ].join(", ");
+        toast.error(
+          <div>
+            <p className="font-semibold">Multiple Sellers Selected</p>
+            <p className="text-sm mt-1">
+              You can only create a combined invoice for contracts from the{" "}
+              <strong>same seller</strong>. The selected contracts belong to
+              different sellers: {sellerNames}. Please select contracts from
+              one seller only.
+            </p>
+          </div>,
+          { duration: 8000 },
+        );
+        return;
+      }
     }
 
     const contractGroups = groupContractsByInvoiceRecipient(selectedRows);
@@ -981,20 +1060,26 @@ const ContractManagementPage = () => {
         });
       }
 
-      // Prepare invoice form data
-      const firstContract = selectedRows[0];
+      // ✅ Use the NEWEST contract date among all selected contracts as the invoice date
+      const newestContractDate = selectedRows.reduce((latest, contract) => {
+        const contractDateStr = contract.contractDate || contract.createdAt;
+        if (!contractDateStr) return latest;
+        const contractDate = new Date(contractDateStr);
+        return contractDate > latest ? contractDate : latest;
+      }, new Date(0));
 
-      // ✅ Use contract date as invoice date
-      const contractDate =
-        firstContract.contractDate || firstContract.createdAt;
-      const invoiceDate = contractDate
-        ? new Date(contractDate).toISOString().split("T")[0]
-        : new Date().toISOString().split("T")[0];
+      const invoiceDate =
+        newestContractDate.getTime() > 0
+          ? newestContractDate.toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0];
+
+      const firstContract = selectedRows[0];
+      const sellerName = firstContract.seller?.legalName || "";
 
       const reference =
         selectedRows.length === 1
-          ? `${firstContract.contractNumber} - ${firstContract.seller?.legalName}`
-          : `Brokerage Invoice - ${selectedRows.length} contracts`;
+          ? `${firstContract.contractNumber} - ${sellerName}`
+          : `Brokerage Invoice - ${sellerName} (${selectedRows.length} contracts)`;
 
       const combinedNotes = selectedRows
         .map((c) => c.notes)
@@ -1002,7 +1087,7 @@ const ContractManagementPage = () => {
         .join("\n---\n");
 
       setInvoiceFormData({
-        invoiceDate: invoiceDate, // ✅ Set to contract date
+        invoiceDate: invoiceDate, // ✅ Set to newest contract date among selection
         dueDate: calculateDueDate(invoiceDate, 14), // ✅ Auto-calculated 14 days after invoice date
         reference: reference,
         notes: combinedNotes || "",
