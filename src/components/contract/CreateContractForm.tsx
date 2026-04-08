@@ -541,13 +541,22 @@ const CreateContractForm = () => {
             <label className="block text-xs font-medium text-gray-700 uppercase">
               CONTRACT DATE *
             </label>
-            <input
-              type="date"
-              name="contractDate"
-              value={formData.contractDate}
-              onChange={handleChange}
-              placeholder="sjfkjdf"
+            <DatePicker
+              selected={formData.contractDate ? new Date(formData.contractDate) : null}
+              onChange={(date: Date | null) => {
+                if (date) {
+                  const offset = date.getTimezoneOffset();
+                  const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+                  setFormData((prev) => ({ ...prev, contractDate: localDate.toISOString().split("T")[0] }));
+                } else {
+                  setFormData((prev) => ({ ...prev, contractDate: "" }));
+                }
+              }}
+              todayButton="Today"
+              dateFormat="yyyy-MM-dd"
+              placeholderText="Select Date"
               className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+              wrapperClassName="w-full"
             />
           </div>
           {/* Delivery Period - Full width on mobile, spans appropriately on larger screens */}
