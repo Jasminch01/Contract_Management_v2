@@ -342,16 +342,34 @@ export interface XeroInvoice {
   currencyCode?: string;
 }
 
+export interface XeroInvoiceSummary {
+  invoiceId: string;
+  invoiceNumber: string;
+  xeroUrl: string;
+  total?: number;
+  totalTax?: number;
+  amountDue?: number;
+  status?: string;
+  recipientType: "seller" | "buyer";
+  recipientName: string;
+  contractCount: number;
+  isUpdate: boolean;
+}
+
 export interface CreateInvoiceResponse {
   isUpdate: boolean;
   success: boolean;
   message: string;
-  data?: {
-    invoiceId: string;
+  splitInvoices?: boolean;
+  splitDetails?: Array<{
+    recipientType: string;
+    recipientName: string;
     invoiceNumber: string;
     xeroUrl: string;
-    invoice: XeroInvoice;
-    isUpdate: boolean;
+  }>;
+  invoices?: XeroInvoiceSummary[];
+  data?: XeroInvoiceSummary & {
+    invoice?: XeroInvoice;
   };
 }
 

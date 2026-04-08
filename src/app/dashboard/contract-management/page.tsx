@@ -140,6 +140,18 @@ const ChangeStatusOptions = [
 
 const rowsPerPageOptions = [10, 25, 50, 100];
 
+// Helper function to calculate due date with proper month/year handling
+const calculateDueDate = (invoiceDateStr: string, daysOffset: number): string => {
+  const invoiceDate = new Date(invoiceDateStr);
+  const dueDate = new Date(invoiceDate);
+  
+  // Add days - JavaScript Date automatically handles month/year boundaries
+  // (e.g., Jan 31 + 14 days = Feb 14, Dec 25 + 14 days = Jan 8 of next year)
+  dueDate.setDate(dueDate.getDate() + daysOffset);
+  
+  return dueDate.toISOString().split("T")[0];
+};
+
 const ContractManagementPage = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -644,6 +656,7 @@ const ContractManagementPage = () => {
     tenantName: null,
     isChecking: false,
   });
+
   // Save filters to localStorage whenever pagination state changes
   useEffect(() => {
     if (isMounted) {
@@ -701,16 +714,52 @@ const ContractManagementPage = () => {
       setSelectedRows([]);
       setToggleCleared((prev) => !prev);
 
-      // Check if it was an update or creation
-      const isUpdate = response?.isUpdate || false;
-      toast.success(
-        <div>
-          <p className="font-semibold">
-            Invoice {isUpdate ? "updated" : "created"} successfully
-          </p>
-        </div>,
-        { duration: 5000 },
-      );
+      // Handle split invoices (Buyer & Seller brokerage)
+      const splitDetails = response?.splitDetails;
+      if (response?.splitInvoices && splitDetails && splitDetails.length > 0) {
+        toast.success(
+          <div>
+            <p className="font-semibold">
+              {splitDetails.length} Draft Invoices Created in Xero
+            </p>
+            <p className="text-sm mt-1 text-gray-600">
+              Brokerage was split between seller and buyer:
+            </p>
+            <ul className="text-sm mt-1 space-y-1">
+              {splitDetails.map(
+                (
+                  detail: {
+                    recipientType: string;
+                    recipientName: string;
+                    invoiceNumber: string;
+                  },
+                  i: number,
+                ) => (
+                  <li key={i}>
+                    <span className="font-medium capitalize">
+                      {detail.recipientType}
+                    </span>{" "}
+                    — {detail.recipientName}
+                    {detail.invoiceNumber && ` (${detail.invoiceNumber})`}
+                  </li>
+                ),
+              )}
+            </ul>
+          </div>,
+          { duration: 8000 },
+        );
+      } else {
+        // Standard single invoice
+        const isUpdate = response?.isUpdate || false;
+        toast.success(
+          <div>
+            <p className="font-semibold">
+              Invoice {isUpdate ? "updated" : "created"} successfully
+            </p>
+          </div>,
+          { duration: 5000 },
+        );
+      }
     },
 
     onError: async (error: any) => {
@@ -854,7 +903,6 @@ const ContractManagementPage = () => {
       if (!groups[recipientKey]) {
         groups[recipientKey] = [];
       }
-
       groups[recipientKey].push(contract);
     });
 
@@ -907,6 +955,50 @@ const ContractManagementPage = () => {
         { duration: 6000 },
       );
       return;
+    }
+
+    // ✅ NEW: If multiple contracts selected, validate they all belong to the same seller
+    if (selectedRows.length > 1) {
+      const firstSellerEmail =
+        selectedRows[0]?.seller?.email?.toLowerCase().trim() || "";
+      const firstSellerName =
+        selectedRows[0]?.seller?.legalName?.toLowerCase().trim() || "";
+
+      const differentSellers = selectedRows.filter((contract) => {
+        const sellerEmail =
+          contract.seller?.email?.toLowerCase().trim() || "";
+        const sellerName =
+          contract.seller?.legalName?.toLowerCase().trim() || "";
+
+        // Match by email (preferred) or by legal name
+        if (firstSellerEmail && sellerEmail) {
+          return sellerEmail !== firstSellerEmail;
+        }
+        return sellerName !== firstSellerName;
+      });
+
+      if (differentSellers.length > 0) {
+        const sellerNames = [
+          ...new Set(
+            selectedRows.map(
+              (c) => c.seller?.legalName || c.seller?.email || "Unknown",
+            ),
+          ),
+        ].join(", ");
+        toast.error(
+          <div>
+            <p className="font-semibold">Multiple Sellers Selected</p>
+            <p className="text-sm mt-1">
+              You can only create a combined invoice for contracts from the{" "}
+              <strong>same seller</strong>. The selected contracts belong to
+              different sellers: {sellerNames}. Please select contracts from
+              one seller only.
+            </p>
+          </div>,
+          { duration: 8000 },
+        );
+        return;
+      }
     }
 
     const contractGroups = groupContractsByInvoiceRecipient(selectedRows);
@@ -968,23 +1060,26 @@ const ContractManagementPage = () => {
         });
       }
 
-      // Prepare invoice form data
-      const defaultDueDate = new Date();
-      defaultDueDate.setDate(defaultDueDate.getDate() + 14); // Default due date 14 days from now
+      // ✅ Use the NEWEST contract date among all selected contracts as the invoice date
+      const newestContractDate = selectedRows.reduce((latest, contract) => {
+        const contractDateStr = contract.contractDate || contract.createdAt;
+        if (!contractDateStr) return latest;
+        const contractDate = new Date(contractDateStr);
+        return contractDate > latest ? contractDate : latest;
+      }, new Date(0));
+
+      const invoiceDate =
+        newestContractDate.getTime() > 0
+          ? newestContractDate.toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0];
 
       const firstContract = selectedRows[0];
-
-      // ✅ Use contract date as invoice date
-      const contractDate =
-        firstContract.contractDate || firstContract.createdAt;
-      const invoiceDate = contractDate
-        ? new Date(contractDate).toISOString().split("T")[0]
-        : new Date().toISOString().split("T")[0];
+      const sellerName = firstContract.seller?.legalName || "";
 
       const reference =
         selectedRows.length === 1
-          ? `${firstContract.contractNumber} - ${firstContract.seller?.legalName}`
-          : `Brokerage Invoice - ${selectedRows.length} contracts`;
+          ? `${firstContract.contractNumber} - ${sellerName}`
+          : `Brokerage Invoice - ${sellerName} (${selectedRows.length} contracts)`;
 
       const combinedNotes = selectedRows
         .map((c) => c.notes)
@@ -992,8 +1087,8 @@ const ContractManagementPage = () => {
         .join("\n---\n");
 
       setInvoiceFormData({
-        invoiceDate: invoiceDate, // ✅ Set to contract date
-        dueDate: defaultDueDate.toISOString().split("T")[0],
+        invoiceDate: invoiceDate, // ✅ Set to newest contract date among selection
+        dueDate: calculateDueDate(invoiceDate, 14), // ✅ Auto-calculated 14 days after invoice date
         reference: reference,
         notes: combinedNotes || "",
       });
@@ -2165,12 +2260,14 @@ const ContractManagementPage = () => {
                     <input
                       type="date"
                       value={invoiceFormData.invoiceDate}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const newInvoiceDate = e.target.value;
                         setInvoiceFormData((prev) => ({
                           ...prev,
-                          invoiceDate: e.target.value,
-                        }))
-                      }
+                          invoiceDate: newInvoiceDate,
+                          dueDate: calculateDueDate(newInvoiceDate, 14),
+                        }));
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>

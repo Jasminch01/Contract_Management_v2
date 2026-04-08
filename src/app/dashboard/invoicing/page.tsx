@@ -132,6 +132,15 @@ const columns = [
     width: "120px",
   },
   {
+    id: "createdAt",
+    name: "DATE INVOICED",
+    selector: (row: TContract) =>
+      row?.createdAt ? new Date(row.createdAt).toLocaleDateString() : "",
+    sortable: true,
+    sortField: "createdAt",
+    width: "130px",
+  },
+  {
     name: "CONTRACT NUMBER",
     selector: (row: TContract) => row?.contractNumber || "",
     sortable: true,
@@ -241,14 +250,14 @@ const InvoicingPage = () => {
   const [toggleCleared, setToggleCleared] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Pagination state - hardcoded to Invoiced status
+  // Pagination state - hardcoded to Invoiced status, default LIFO (newest first)
   const [paginationState, setPaginationState] = useState<PaginationState>({
     page: 1,
     limit: 10,
     searchFilters: {},
     dateFrom: undefined,
     dateTo: undefined,
-    sortBy: "contractDate",
+    sortBy: "createdAt",
     sortOrder: "desc",
   });
   const queryClient = useQueryClient();
@@ -712,6 +721,8 @@ const InvoicingPage = () => {
           }}
           sortServer
           onSort={handleSort}
+          defaultSortFieldId="createdAt"
+          defaultSortAsc={false}
           noDataComponent={
             <div className="p-10 text-center text-gray-500">
               {hasActiveFilters
