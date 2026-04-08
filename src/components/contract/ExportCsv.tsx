@@ -36,7 +36,6 @@ const ExportCsv: React.FC<ExportCSVButtonProps> = ({ selectedRows }) => {
   ];
 
   return (
-    // @ts-expect-error
     <CSVLink
       data={transformedData}
       headers={headers}

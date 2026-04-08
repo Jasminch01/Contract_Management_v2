@@ -145,7 +145,6 @@ const ExportCSVPrice: React.FC<ExportCSVButtonProps> = ({
   return (
     <>
       {hasData ? (
-        // @ts-expect-error
         <CSVLink
           data={csvData}
           headers={headers}
