@@ -144,11 +144,11 @@ const rowsPerPageOptions = [10, 25, 50, 100];
 const calculateDueDate = (invoiceDateStr: string, daysOffset: number): string => {
   const invoiceDate = new Date(invoiceDateStr);
   const dueDate = new Date(invoiceDate);
-  
+
   // Add days - JavaScript Date automatically handles month/year boundaries
   // (e.g., Jan 31 + 14 days = Feb 14, Dec 25 + 14 days = Jan 8 of next year)
   dueDate.setDate(dueDate.getDate() + daysOffset);
-  
+
   return dueDate.toISOString().split("T")[0];
 };
 
@@ -584,16 +584,15 @@ const ContractManagementPage = () => {
             className="text-xs flex items-center gap-x-3 hover:bg-gray-100 px-3 py-1 rounded transition-colors w-full"
           >
             <RiCircleFill
-              className={`${
-                row.status?.toLowerCase() === "complete"
-                  ? "text-[#108A2B]"
-                  : row.status?.toLowerCase() === "invoiced" ||
-                      row.status?.toLowerCase() === "manually-invoiced"
-                    ? "text-[#3B82F6]"
-                    : row.status?.toLowerCase() === "draft"
-                      ? "text-[#EF4444]"
-                      : "text-[#FAD957]"
-              }`}
+              className={`${row.status?.toLowerCase() === "complete"
+                ? "text-[#108A2B]"
+                : row.status?.toLowerCase() === "invoiced" ||
+                  row.status?.toLowerCase() === "manually-invoiced"
+                  ? "text-[#3B82F6]"
+                  : row.status?.toLowerCase() === "draft"
+                    ? "text-[#EF4444]"
+                    : "text-[#FAD957]"
+                }`}
             />
             <span>{row.status?.replace("-", " ") || "Unknown"}</span>
             <MdOutlineEdit
@@ -1226,13 +1225,11 @@ const ContractManagementPage = () => {
         if (updatedCount > 0 && createdCount > 0) {
           successMessage = `Successfully created ${createdCount} and updated ${updatedCount} invoices!`;
         } else if (updatedCount > 0) {
-          successMessage = `Successfully updated ${updatedCount} invoice${
-            updatedCount > 1 ? "s" : ""
-          }!`;
+          successMessage = `Successfully updated ${updatedCount} invoice${updatedCount > 1 ? "s" : ""
+            }!`;
         } else {
-          successMessage = `Successfully created ${createdCount} invoice${
-            createdCount > 1 ? "s" : ""
-          }!`;
+          successMessage = `Successfully created ${createdCount} invoice${createdCount > 1 ? "s" : ""
+            }!`;
         }
 
         toast.success(successMessage, {
@@ -1269,7 +1266,7 @@ const ContractManagementPage = () => {
   // Track if search filters are active
   const [hasSearchFilters, setHasSearchFilters] = useState(
     Object.keys(paginationState.searchFilters).length > 0 &&
-      Object.values(paginationState.searchFilters).some((v) => v.trim() !== ""),
+    Object.values(paginationState.searchFilters).some((v) => v.trim() !== ""),
   );
 
   // Handle search filter changes from AdvanceSearchFilter component
@@ -1366,6 +1363,7 @@ const ContractManagementPage = () => {
   const contracts = contractsResponse?.data || [];
   const totalPages = contractsResponse?.totalPages || 0;
   const totalRecords = contractsResponse?.total || 0;
+  const totalTonnes = contractsResponse?.totalTonnes || 0;
   const currentPage = contractsResponse?.page || 1;
 
   // Update filter active state
@@ -1825,16 +1823,21 @@ const ContractManagementPage = () => {
 
       {/* Table Controls */}
       <div className="mt-3">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 px-4">
-          <div className="w-full md:w-auto">
-            <p className="text-lg font-semibold">
-              List of Contracts ({totalRecords} total)
+        <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-6 px-4">
+          <div className="w-full xl:w-auto shrink-0">
+            <p className="text-lg font-semibold flex items-center flex-wrap gap-2">
+              <span>List of Contracts ({totalRecords} total)</span>
               {isFilterActive && (
                 <span className="text-sm font-normal text-gray-600">
                   {` - Showing ${contracts.length} filtered results`}
                 </span>
               )}
             </p>
+            {totalTonnes > 0 && (
+              <p className="text-md font-semibold text-gray-800 mt-1 mb-1">
+                Total Tonnes: {totalTonnes.toLocaleString()} MT
+              </p>
+            )}
             <p className="text-sm text-gray-500">
               Page {currentPage} of {totalPages}
               {totalPages > 0 && (
@@ -1861,7 +1864,7 @@ const ContractManagementPage = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="w-full md:w-auto lg:flex lg:flex-row gap-2 grid grid-cols-3">
+          <div className="w-full xl:w-auto flex flex-nowrap overflow-x-auto overflow-y-hidden gap-2 justify-start xl:justify-end flex-1 pb-2 [&>*]:shrink-0">
             <button
               onClick={handleCreateInvoice}
               disabled={
@@ -1869,13 +1872,12 @@ const ContractManagementPage = () => {
                 selectedRows[0]?.status?.toLowerCase() === "draft" ||
                 xeroStatus.isChecking
               }
-              className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${
-                selectedRows.length > 0 &&
+              className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${selectedRows.length > 0 &&
                 selectedRows[0]?.status?.toLowerCase() !== "draft" &&
                 !xeroStatus.isChecking
-                  ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
-                  : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
-              }`}
+                ? "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
+                : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
+                }`}
             >
               {xeroStatus.isChecking ? (
                 <>
@@ -1894,22 +1896,20 @@ const ContractManagementPage = () => {
             <button
               onClick={handleBulkStatusUpdate}
               disabled={selectedRows.length === 0}
-              className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${
-                selectedRows.length > 0
-                  ? "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 cursor-pointer"
-                  : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
-              }`}
+              className={`w-full md:w-auto xl:px-3 xl:py-2 border rounded flex items-center justify-center gap-2 text-sm transition-colors ${selectedRows.length > 0
+                ? "border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 cursor-pointer"
+                : "border-gray-200 cursor-not-allowed opacity-50 pointer-events-none"
+                }`}
             >
               <MdOutlineEdit />
               Update Status
             </button>
             <button
               onClick={handleDuplicate}
-              className={`w-full md:w-auto px-3 py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${
-                selectedRows.length > 0
-                  ? "cursor-pointer"
-                  : "cursor-not-allowed opacity-50 pointer-events-none"
-              }`}
+              className={`w-full md:w-auto px-3 py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${selectedRows.length > 0
+                ? "cursor-pointer"
+                : "cursor-not-allowed opacity-50 pointer-events-none"
+                }`}
             >
               <HiOutlineDocumentDuplicate />
               Duplicate
@@ -1919,33 +1919,30 @@ const ContractManagementPage = () => {
 
             <button
               onClick={() => handleEmail("buyer")}
-              className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${
-                selectedRows.length > 0
-                  ? "cursor-pointer"
-                  : "cursor-not-allowed opacity-50 pointer-events-none"
-              }`}
+              className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${selectedRows.length > 0
+                ? "cursor-pointer"
+                : "cursor-not-allowed opacity-50 pointer-events-none"
+                }`}
             >
               <IoIosSend />
               Email to Buyer
             </button>
             <button
               onClick={() => handleEmail("seller")}
-              className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${
-                selectedRows.length > 0
-                  ? "cursor-pointer"
-                  : "cursor-not-allowed opacity-50 pointer-events-none"
-              }`}
+              className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${selectedRows.length > 0
+                ? "cursor-pointer"
+                : "cursor-not-allowed opacity-50 pointer-events-none"
+                }`}
             >
               <IoIosSend />
               Email to Seller
             </button>
             <button
               onClick={handleEdit}
-              className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${
-                selectedRows.length > 0
-                  ? "cursor-pointer"
-                  : "cursor-not-allowed opacity-50 pointer-events-none"
-              }`}
+              className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${selectedRows.length > 0
+                ? "cursor-pointer"
+                : "cursor-not-allowed opacity-50 pointer-events-none"
+                }`}
             >
               <MdOutlineEdit />
               Edit
@@ -1953,11 +1950,10 @@ const ContractManagementPage = () => {
             <button
               onClick={handleDelete}
               disabled={deleteMutation.isPending}
-              className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${
-                selectedRows.length > 0 && !deleteMutation.isPending
-                  ? "cursor-pointer"
-                  : "cursor-not-allowed opacity-50 pointer-events-none"
-              }`}
+              className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors ${selectedRows.length > 0 && !deleteMutation.isPending
+                ? "cursor-pointer"
+                : "cursor-not-allowed opacity-50 pointer-events-none"
+                }`}
             >
               <RiDeleteBin6Fill className="text-red-500" />
               {deleteMutation.isPending ? "Deleting..." : "Delete"}
@@ -1967,9 +1963,8 @@ const ContractManagementPage = () => {
             <div className="relative">
               <button
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm cursor-pointer hover:bg-gray-100 transition-colors ${
-                  isFilterActive ? "bg-blue-50 border-blue-300" : ""
-                }`}
+                className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm cursor-pointer hover:bg-gray-100 transition-colors ${isFilterActive ? "bg-blue-50 border-blue-300" : ""
+                  }`}
               >
                 <IoFilterSharp
                   className={isFilterActive ? "text-blue-600" : ""}
@@ -1994,11 +1989,10 @@ const ContractManagementPage = () => {
                     {statusOptions.map((option) => (
                       <div
                         key={option.value}
-                        className={`px-4 py-2 text-sm cursor-pointer flex items-center ${
-                          paginationState.status === option.value
-                            ? "bg-blue-50 text-blue-600"
-                            : "hover:bg-gray-50"
-                        }`}
+                        className={`px-4 py-2 text-sm cursor-pointer flex items-center ${paginationState.status === option.value
+                          ? "bg-blue-50 text-blue-600"
+                          : "hover:bg-gray-50"
+                          }`}
                         onClick={() => handleStatusChange(option.value)}
                       >
                         <span className="flex-grow">{option.label}</span>
@@ -2091,8 +2085,8 @@ const ContractManagementPage = () => {
             noDataComponent={
               <div className="p-10 text-center text-gray-500">
                 {totalRecords === 0 &&
-                !hasSearchFilters &&
-                (!paginationState.status || paginationState.status === "all")
+                  !hasSearchFilters &&
+                  (!paginationState.status || paginationState.status === "all")
                   ? "No contracts found. Create your first contract to get started."
                   : "No contracts found matching your current filters."}
                 {isFilterActive && (
@@ -2213,7 +2207,7 @@ const ContractManagementPage = () => {
                     <span className="ml-2 font-medium">
                       {new Date(
                         selectedRows[0]?.contractDate ||
-                          selectedRows[0]?.createdAt,
+                        selectedRows[0]?.createdAt,
                       ).toLocaleDateString()}
                     </span>
                   </div>
@@ -2581,7 +2575,7 @@ const ContractManagementPage = () => {
                     <p>Please find attached the contract information.</p>
                     <div className="bg-blue-50 p-2 rounded border-l-4 border-blue-400">
                       {contractDescriptions.filter((d) => d.trim()).length >
-                      0 ? (
+                        0 ? (
                         contractDescriptions
                           .filter((d) => d.trim())
                           .map((desc, idx) => <p key={idx}>• {desc}</p>)

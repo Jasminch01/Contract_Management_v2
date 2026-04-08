@@ -597,19 +597,33 @@ const EditableContract: React.FC<ContractProps> = ({
                 Contract Date
               </div>
               <div className="w-1/2 p-3">
-                <input
-                  type="date"
-                  value={
+                <DatePicker
+                  selected={
                     contract?.contractDate
                       ? new Date(contract.contractDate)
-                          ?.toISOString()
-                          ?.split("T")[0]
-                      : new Date(initialContract.createdAt)
-                          ?.toISOString()
-                          ?.split("T")[0]
+                      : initialContract?.createdAt
+                      ? new Date(initialContract.createdAt)
+                      : null
                   }
-                  onChange={(e) => handleChange(e, "contractDate")}
+                  onChange={(date: Date | null) => {
+                    if (date) {
+                      const offset = date.getTimezoneOffset();
+                      const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+                      handleChange(
+                        { target: { name: "contractDate", value: localDate.toISOString().split("T")[0] } } as any,
+                        "contractDate"
+                      );
+                    } else {
+                      handleChange(
+                        { target: { name: "contractDate", value: "" } } as any,
+                        "contractDate"
+                      );
+                    }
+                  }}
+                  todayButton="Today"
+                  dateFormat="yyyy-MM-dd"
                   className="w-full border border-gray-300 p-1 rounded"
+                  wrapperClassName="w-full"
                 />
               </div>
             </div>

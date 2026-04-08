@@ -245,6 +245,7 @@ export interface ContractsPaginatedResponse {
   page: number;
   totalPages: number;
   total: number;
+  totalTonnes?: number;
   data: TContract[];
   hasNextPage?: boolean;
   hasPrevPage?: boolean;
