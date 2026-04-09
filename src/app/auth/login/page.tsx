@@ -73,7 +73,8 @@ export default function SignInWithEmailVerification() {
       }
     } else {
       // Generic case: Try to prompt if supported but deferredPrompt missed
-      alert("Please check your browser menu to install this app.");
+      setShowIOSModal(true);
+      setShowInstallBtn(false);
     }
   };
 
@@ -250,14 +251,29 @@ export default function SignInWithEmailVerification() {
                 </div>
 
                 <div className="w-full space-y-4 pt-4">
-                  <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl">
-                    <div className="bg-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-purple-600 shadow-sm">1</div>
-                    <p className="text-sm text-gray-700 text-left">Tap the <span className="font-bold inline-flex items-center gap-1 mx-1 px-2 py-0.5 bg-gray-200 rounded text-blue-500 text-lg uppercase shadow-sm pr-1">SHARE <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg></span> icon at the bottom of Safari.</p>
-                  </div>
-                  <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl">
-                    <div className="bg-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-purple-600 shadow-sm">2</div>
-                    <p className="text-sm text-gray-700 text-left">Select <span className="font-bold">Add to Home Screen</span> from the list.</p>
-                  </div>
+                  {isIOS ? (
+                    <>
+                      <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl">
+                        <div className="bg-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-purple-600 shadow-sm">1</div>
+                        <p className="text-sm text-gray-700 text-left">Tap the <span className="font-bold inline-flex items-center gap-1 mx-1 px-2 py-0.5 bg-gray-200 rounded text-blue-500 text-lg uppercase shadow-sm pr-1">SHARE <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg></span> icon at the bottom of Safari.</p>
+                      </div>
+                      <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl">
+                        <div className="bg-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-purple-600 shadow-sm">2</div>
+                        <p className="text-sm text-gray-700 text-left">Select <span className="font-bold">Add to Home Screen</span> from the list.</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl">
+                        <div className="bg-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-purple-600 shadow-sm">1</div>
+                        <p className="text-sm text-gray-700 text-left">Tap the <span className="font-bold">3-dots menu</span> icon (⋮) at the top right of your browser.</p>
+                      </div>
+                      <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl">
+                        <div className="bg-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-purple-600 shadow-sm">2</div>
+                        <p className="text-sm text-gray-700 text-left">Select <span className="font-bold">Install app</span> or <span className="font-bold">Add to Home screen</span>.</p>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <button
                   onClick={() => setShowIOSModal(false)}
