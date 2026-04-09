@@ -18,6 +18,7 @@ export default function SignInWithEmailVerification() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBtn, setShowInstallBtn] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [showIOSModal, setShowIOSModal] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -58,7 +59,11 @@ export default function SignInWithEmailVerification() {
   }, []);
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
+    if (isIOS) {
+      // Show iOS instruction modal
+      setShowIOSModal(true);
+      setShowInstallBtn(false);
+    } else if (deferredPrompt) {
       // Trigger native prompt (Android/Chrome)
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
@@ -66,9 +71,6 @@ export default function SignInWithEmailVerification() {
         setDeferredPrompt(null);
         setShowInstallBtn(false);
       }
-    } else if (isIOS) {
-      // Show iOS instruction alert
-      alert("To install: Tap the 'Share' button at the bottom of Safari and select 'Add to Home Screen' 📲");
     } else {
       // Generic case: Try to prompt if supported but deferredPrompt missed
       alert("Please check your browser menu to install this app.");
@@ -217,14 +219,10 @@ export default function SignInWithEmailVerification() {
     setError("");
   };
 
-  function setShowIOSModal(arg0: boolean): void {
-    throw new Error("Function not implemented.");
-  }
-
   return (
     <div className="flex justify-center items-center min-h-screen bg-[#F5F5F5] p-4">
       {/* iOS Instruction Bottom Sheet Modal */}
-      {setShowIOSModal && (
+      {showIOSModal && (
         <>
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 transition-opacity duration-300"
@@ -235,10 +233,10 @@ export default function SignInWithEmailVerification() {
               {/* Close Button on Top Right of Modal */}
               <button
                 onClick={() => setShowIOSModal(false)}
-                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100 active:scale-90"
+                className="absolute top-4 right-4 p-2 z-10 text-gray-400 hover:text-gray-500 transition-colors bg-gray-50/50 rounded-full hover:bg-gray-100 active:scale-90"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
 
@@ -305,21 +303,21 @@ export default function SignInWithEmailVerification() {
           </div>
 
           {/* PWA Trigger Banner - Refined Minimalist UI (Mobile Only) */}
-          {showInstallBtn && !setShowIOSModal && (
+          {showInstallBtn && !showIOSModal && (
             <div className="xl:hidden fixed bottom-6 left-4 right-4 z-50 animate-in slide-in-from-bottom-10 duration-500">
-              <div className="bg-white/95 backdrop-blur-xl border border-gray-100 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-[24px] p-4 flex items-center justify-between gap-4 relative overflow-hidden">
+              <div className="bg-white/95 backdrop-blur-xl border border-gray-100 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-[24px] p-4 pt-8 flex items-center justify-between gap-4 relative overflow-hidden">
                 {/* Close Button on Top Right of Banner */}
                 <button
                   onClick={() => setShowInstallBtn(false)}
-                  className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100 active:scale-90"
+                  className="absolute top-2 right-2 p-1.5 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100 active:scale-90 bg-gray-50"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
 
-                <div className="flex items-center gap-4 pr-4">
-                  <div className="bg-purple-50 p-3 rounded-2xl">
+                <div className="flex items-center gap-3 pr-2">
+                  <div className="bg-purple-50 p-2.5 rounded-2xl">
                     <Image
                       src="/Frame.png"
                       alt="App Icon"
@@ -329,15 +327,15 @@ export default function SignInWithEmailVerification() {
                     />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-gray-900 leading-tight">Install app for better experience</p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">Quick access & more features</p>
+                    <p className="text-sm font-bold text-gray-900 leading-tight">Install app</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">For a better experience</p>
                   </div>
                 </div>
 
-                <div className="shrink-0">
+                <div className="shrink-0 z-10 relative">
                   <button
                     onClick={handleInstallClick}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                    className="bg-[#2A5D36] hover:bg-[#1e4a2a] text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center gap-1.5"
                   >
                     <FiDownload className="text-sm" />
                     Install
