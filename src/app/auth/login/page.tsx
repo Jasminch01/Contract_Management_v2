@@ -26,7 +26,7 @@ export default function SignInWithEmailVerification() {
       const userAgent = window.navigator.userAgent.toLowerCase();
       return /iphone|ipad|ipod/.test(userAgent);
     };
-    
+
     // Check if app is already installed
     const isStandalone = () => {
       return (window.matchMedia('(display-mode: standalone)').matches) || (window.navigator as any).standalone === true;
@@ -248,34 +248,40 @@ export default function SignInWithEmailVerification() {
             </p>
           </div>
 
-          {/* PWA Smart Banner - Professional Mobile UI (Hidden on Desktop) */}
+          {/* PWA Smart Banner - Refined Minimalist UI (Mobile Only) */}
           {showInstallBtn && (
             <div className="xl:hidden fixed bottom-6 left-4 right-4 z-50 animate-in slide-in-from-bottom-10 duration-500">
-              <div className="bg-white/90 backdrop-blur-xl border border-gray-200 shadow-2xl rounded-2xl p-4 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <div className="bg-purple-100 p-2.5 rounded-xl">
+              <div className="bg-white/95 backdrop-blur-xl border border-gray-100 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-[24px] p-4 flex items-center justify-between gap-4 relative overflow-hidden">
+                {/* Close Button */}
+                <button
+                  onClick={() => setShowInstallBtn(false)}
+                  className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100 active:scale-90"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <div className="flex items-center gap-4 pr-4">
+                  <div className="bg-purple-50 p-3 rounded-2xl">
                     <Image
                       src="/Frame.png"
                       alt="App Icon"
                       width={32}
                       height={32}
+                      className="rounded shadow-sm"
                     />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-gray-900">Contract Manager</h4>
-                    <p className="text-[11px] text-gray-500 font-medium">Install app for better experience</p>
+                    <p className="text-sm font-bold text-gray-900 leading-tight">Install app for better experience</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Native features & offline access</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowInstallBtn(false)}
-                    className="text-xs text-gray-400 px-2 py-1 hover:text-gray-600 transition-colors"
-                  >
-                    Not now
-                  </button>
+
+                <div className="shrink-0">
                   <button
                     onClick={handleInstallClick}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 flex items-center gap-1.5"
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2.5 rounded-2xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center gap-1.5"
                   >
                     <FiDownload className="text-sm" />
                     Install
