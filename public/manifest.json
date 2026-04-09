@@ -1,6 +1,6 @@
 {
   "name": "Contract Management",
-  "short_name": "Contracts",
+  "short_name": "Contract Management",
   "description": "Progressive Web App for managing contracts.",
   "start_url": "/",
   "display": "standalone",
