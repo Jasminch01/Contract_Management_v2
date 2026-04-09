@@ -217,11 +217,67 @@ export default function SignInWithEmailVerification() {
     setError("");
   };
 
+  function setShowIOSModal(arg0: boolean): void {
+    throw new Error("Function not implemented.");
+  }
+
   return (
     <div className="flex justify-center items-center min-h-screen bg-[#F5F5F5] p-4">
+      {/* iOS Instruction Bottom Sheet Modal */}
+      {setShowIOSModal && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 transition-opacity duration-300"
+            onClick={() => setShowIOSModal(false)}
+          />
+          <div className="fixed bottom-0 left-0 right-0 z-101 animate-in slide-in-from-bottom duration-500 ease-out">
+            <div className="bg-white rounded-t-[32px] p-8 shadow-2xl relative">
+              {/* Close Button on Top Right of Modal */}
+              <button
+                onClick={() => setShowIOSModal(false)}
+                className="absolute top-6 right-6 p-2 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100 active:scale-90"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <div className="flex flex-col items-center text-center gap-6">
+                <div className="bg-purple-50 p-4 rounded-3xl">
+                  <Image src="/Frame.png" alt="App" width={64} height={64} className="rounded-xl shadow-md" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Install Contract Manager</h3>
+                  <p className="text-sm text-gray-500 mt-2 max-w-[280px]">Follow these steps to add the app to your home screen:</p>
+                </div>
+
+                <div className="w-full space-y-4 pt-4">
+                  <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl">
+                    <div className="bg-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-purple-600 shadow-sm">1</div>
+                    <p className="text-sm text-gray-700 text-left">Tap the <span className="font-bold inline-flex items-center gap-1 mx-1 px-2 py-0.5 bg-gray-200 rounded text-blue-500 text-lg uppercase shadow-sm pr-1">SHARE <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg></span> icon at the bottom of Safari.</p>
+                  </div>
+                  <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl">
+                    <div className="bg-white w-8 h-8 rounded-full flex items-center justify-center font-bold text-purple-600 shadow-sm">2</div>
+                    <p className="text-sm text-gray-700 text-left">Select <span className="font-bold">Add to Home Screen</span> from the list.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowIOSModal(false)}
+                  className="mt-4 w-full bg-purple-600 text-white py-4 rounded-2xl font-bold active:scale-95 transition-all shadow-xl shadow-purple-200"
+                >
+                  Got it!
+                </button>
+              </div>
+            </div>
+            {/* Safe Area Padding for iPhone Home Indicator */}
+            <div className="h-[env(safe-area-inset-bottom,24px)] bg-white w-full" />
+          </div>
+        </>
+      )}
+
       <div className="flex flex-col lg:flex-row justify-center items-center gap-8 lg:gap-32 w-full">
         {/* Left decorative image - hidden on mobile */}
-        <div className="hidden lg:block mt-10">
+        <div className="hidden lg:block mt-20">
           <Image src={"/deg1.png"} width={400} height={400} alt="design" />
         </div>
 
@@ -248,11 +304,11 @@ export default function SignInWithEmailVerification() {
             </p>
           </div>
 
-          {/* PWA Smart Banner - Refined Minimalist UI (Mobile Only) */}
-          {showInstallBtn && (
+          {/* PWA Trigger Banner - Refined Minimalist UI (Mobile Only) */}
+          {showInstallBtn && !setShowIOSModal && (
             <div className="xl:hidden fixed bottom-6 left-4 right-4 z-50 animate-in slide-in-from-bottom-10 duration-500">
               <div className="bg-white/95 backdrop-blur-xl border border-gray-100 shadow-[0_8px_32px_rgba(0,0,0,0.12)] rounded-[24px] p-4 flex items-center justify-between gap-4 relative overflow-hidden">
-                {/* Close Button */}
+                {/* Close Button on Top Right of Banner */}
                 <button
                   onClick={() => setShowInstallBtn(false)}
                   className="absolute top-3 right-3 p-1.5 text-gray-400 hover:text-gray-600 transition-colors rounded-full hover:bg-gray-100 active:scale-90"
@@ -274,7 +330,7 @@ export default function SignInWithEmailVerification() {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-gray-900 leading-tight">Install app for better experience</p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">Native features & offline access</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Quick access & more features</p>
                   </div>
                 </div>
 
