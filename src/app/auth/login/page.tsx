@@ -17,29 +17,61 @@ export default function SignInWithEmailVerification() {
   const [verificationCode, setVerificationCode] = useState("");
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBtn, setShowInstallBtn] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    // Check if device is iOS (iPhone/iPad)
+    const checkIOS = () => {
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      return /iphone|ipad|ipod/.test(userAgent);
+    };
+    
+    // Check if app is already installed
+    const isStandalone = () => {
+      return (window.matchMedia('(display-mode: standalone)').matches) || (window.navigator as any).standalone === true;
+    };
+
+    setIsIOS(checkIOS());
+
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
+      // On Android/Chrome, we show the banner once the browser is ready
       setShowInstallBtn(true);
     };
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
 
+    // Manual fallback for mobile (e.g., iOS) where prompt isn't supported
+    // Show banner after 3 seconds if on mobile and not already installed
+    const timer = setTimeout(() => {
+      if (!isStandalone() && /android|iphone|ipad|ipod/.test(window.navigator.userAgent.toLowerCase())) {
+        setShowInstallBtn(true);
+      }
+    }, 3000);
+
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      clearTimeout(timer);
     };
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      setDeferredPrompt(null);
-      setShowInstallBtn(false);
+    if (deferredPrompt) {
+      // Trigger native prompt (Android/Chrome)
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === "accepted") {
+        setDeferredPrompt(null);
+        setShowInstallBtn(false);
+      }
+    } else if (isIOS) {
+      // Show iOS instruction alert
+      alert("To install: Tap the 'Share' button at the bottom of Safari and select 'Add to Home Screen' 📲");
+    } else {
+      // Generic case: Try to prompt if supported but deferredPrompt missed
+      alert("Please check your browser menu to install this app.");
     }
   };
 
