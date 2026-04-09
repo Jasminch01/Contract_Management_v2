@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import Sidebar from "@/components/Sidebar";
+import BottomNav from "@/components/BottomNav";
+import MobileAppBar from "@/components/MobileAppBar";
 import { useUser } from "@clerk/nextjs";
 import { userLogin } from "@/api/Auth";
 
@@ -134,9 +136,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   // Render dashboard
   return (
-    <div className="md:flex">
+    <div className="xl:flex">
       <Sidebar />
-      <div className="md:flex-1 h-screen lg:w-[20rem] w-full">{children}</div>
+      <MobileAppBar />
+      <div className="xl:flex-1 min-h-screen pt-16 pb-[88px] xl:pt-0 xl:pb-0 w-full overflow-x-hidden">
+        {children}
+      </div>
+      <BottomNav />
     </div>
   );
 }

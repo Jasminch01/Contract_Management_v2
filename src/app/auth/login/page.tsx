@@ -3,7 +3,8 @@
 import { useSignIn } from "@clerk/nextjs";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { FiDownload } from "react-icons/fi";
 
 type SignInStep = "credentials" | "verification";
 
@@ -14,7 +15,33 @@ export default function SignInWithEmailVerification() {
   const [step, setStep] = useState<SignInStep>("credentials");
   const [email, setEmail] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBtn(true);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      setDeferredPrompt(null);
+      setShowInstallBtn(false);
+    }
+  };
 
   // Step 1: Handle email/password submission and send verification code
   const handleCredentialsSubmit = async (
@@ -188,6 +215,43 @@ export default function SignInWithEmailVerification() {
                 : `We've sent a verification code to ${email}`}
             </p>
           </div>
+
+          {/* PWA Smart Banner - Professional Mobile UI */}
+          {showInstallBtn && (
+            <div className="fixed bottom-6 left-4 right-4 z-50 animate-in slide-in-from-bottom-10 duration-500">
+              <div className="bg-white/90 backdrop-blur-xl border border-gray-200 shadow-2xl rounded-2xl p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="bg-purple-100 p-2.5 rounded-xl">
+                    <Image
+                      src="/Frame.png"
+                      alt="App Icon"
+                      width={32}
+                      height={32}
+                    />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-900">Contract Manager</h4>
+                    <p className="text-[11px] text-gray-500 font-medium">Install app for better experience</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowInstallBtn(false)}
+                    className="text-xs text-gray-400 px-2 py-1 hover:text-gray-600 transition-colors"
+                  >
+                    Not now
+                  </button>
+                  <button
+                    onClick={handleInstallClick}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95 flex items-center gap-1.5"
+                  >
+                    <FiDownload className="text-sm" />
+                    Install
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Step 1: Credentials Form */}
           {step === "credentials" && (

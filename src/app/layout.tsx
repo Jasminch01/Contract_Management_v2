@@ -36,6 +36,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <link rel="shortcut icon" href="/Favicon.png" type="image/x-icon" />
+      <link rel="manifest" href="/manifest.json" />
+      <meta name="theme-color" content="#000000" />
+      <meta name="apple-mobile-web-app-capable" content="yes" />
+      <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+      <meta name="apple-mobile-web-app-title" content="Contracts" />
+      <link rel="apple-touch-icon" href="/Favicon.png" />
       <ClerkProvider>
         <body className={satoshiFont.className}>
           <QueryProvider>

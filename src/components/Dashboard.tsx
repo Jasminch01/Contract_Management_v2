@@ -30,7 +30,7 @@ const ChartSkeleton = () => (
 
 // Loading State Component
 const DashboardSkeleton = () => (
-  <div className="mt-20 pl-10 pr-3">
+  <div className="mt-6 md:mt-20 px-4 md:pl-10 md:pr-3">
     <div className="">
       <div className="h-6 bg-gray-200 rounded mb-10 w-32 animate-pulse"></div>
 
@@ -53,7 +53,7 @@ const DashboardSkeleton = () => (
 
 // Error State Component
 const ErrorState = ({ title, message, onRetry }) => (
-  <div className="mt-20 pl-10 pr-3">
+  <div className="mt-6 md:mt-20 px-4 md:pl-10 md:pr-3">
     <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
       <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md">
         <div className="text-red-500 mb-4">
@@ -154,14 +154,14 @@ const Dashboard = () => {
     historicalData || {};
 
   return (
-    <div className="mt-20 pl-10 pr-3">
+    <div className="mt-6 md:mt-20 px-4 md:pl-10 md:pr-3">
       <div className="">
-        <div className="flex justify-between">
-          <p className="font-bold text-xl mb-10">Dashboard</p>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-10">
+          <p className="font-bold text-xl">Dashboard</p>
           <div>
             <button
               onClick={exportDatabaseCSV}
-              className="cursor-pointer px-3 py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors "
+              className="w-full sm:w-auto cursor-pointer px-4 py-2.5 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors bg-white shadow-sm"
             >
               <FiDownload /> Export All Data
             </button>

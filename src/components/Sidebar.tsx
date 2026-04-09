@@ -64,23 +64,9 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* Mobile Menu Icon */}
-      <div className="xl:hidden fixed top-5 left-5 z-50">
-        <button
-          onClick={toggleSidebar}
-          className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"
-        >
-          <FaBars className="text-xl" />
-        </button>
-      </div>
-
-      {/* Sidebar */}
+      {/* Sidebar - Desktop Only */}
       <div
-        className={`fixed xl:relative 2xl:w-[15%] h-screen shadow-right border-r border-gray-200 bg-white transform transition-transform duration-300 ease-in-out top-0 z-20 ${
-          isSidebarOpen
-            ? "translate-x-0 w-[50%]"
-            : "-translate-x-full xl:translate-x-0"
-        }`}
+        className="hidden xl:block xl:relative 2xl:w-[15%] h-screen shadow-right border-r border-gray-200 bg-white top-0 z-20"
       >
         <div className="h-screen px-2 flex flex-col justify-between">
           <div>
