@@ -242,8 +242,8 @@ export default function SignInWithEmailVerification() {
               </button>
 
               <div className="flex flex-col items-center text-center gap-6">
-                <div className="bg-purple-50 p-4 rounded-3xl">
-                  <Image src="/Frame.png" alt="App" width={64} height={64} className="rounded-xl shadow-md" />
+                <div className="p-4 rounded-3xl">
+                  <Image src="/Frame.png" alt="App" width={64} height={64} className="rounded-xl" />
                 </div>
                 <div>
                   <h3 className="text-xl font-bold text-gray-900">Install Contract Manager</h3>
@@ -333,13 +333,13 @@ export default function SignInWithEmailVerification() {
                 </button>
 
                 <div className="flex items-center gap-3 pr-2">
-                  <div className="bg-purple-50 p-2.5 rounded-2xl">
+                  <div className="p-2.5 rounded-2xl">
                     <Image
                       src="/Frame.png"
                       alt="App Icon"
                       width={32}
                       height={32}
-                      className="rounded shadow-sm"
+                      className="rounded"
                     />
                   </div>
                   <div>
