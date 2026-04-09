@@ -216,9 +216,9 @@ export default function SignInWithEmailVerification() {
             </p>
           </div>
 
-          {/* PWA Smart Banner - Professional Mobile UI */}
+          {/* PWA Smart Banner - Professional Mobile UI (Hidden on Desktop) */}
           {showInstallBtn && (
-            <div className="fixed bottom-6 left-4 right-4 z-50 animate-in slide-in-from-bottom-10 duration-500">
+            <div className="xl:hidden fixed bottom-6 left-4 right-4 z-50 animate-in slide-in-from-bottom-10 duration-500">
               <div className="bg-white/90 backdrop-blur-xl border border-gray-200 shadow-2xl rounded-2xl p-4 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="bg-purple-100 p-2.5 rounded-xl">
