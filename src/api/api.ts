@@ -14,6 +14,13 @@ export const instance: AxiosInstance = axios.create({
 
 instance.interceptors.request.use(
   (config) => {
+    // Get token from localStorage (Fixes iOS ITP issues)
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("token");
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
     return config;
   },
   (error) => {
