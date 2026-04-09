@@ -30,7 +30,7 @@ const ChartSkeleton = () => (
 
 // Loading State Component
 const DashboardSkeleton = () => (
-  <div className="mt-20 pl-10 pr-3">
+  <div className="mt-6 md:mt-20 px-4 md:pl-10 md:pr-3">
     <div className="">
       <div className="h-6 bg-gray-200 rounded mb-10 w-32 animate-pulse"></div>
 
@@ -53,7 +53,7 @@ const DashboardSkeleton = () => (
 
 // Error State Component
 const ErrorState = ({ title, message, onRetry }) => (
-  <div className="mt-20 pl-10 pr-3">
+  <div className="mt-6 md:mt-20 px-4 md:pl-10 md:pr-3">
     <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
       <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md">
         <div className="text-red-500 mb-4">
@@ -154,82 +154,84 @@ const Dashboard = () => {
     historicalData || {};
 
   return (
-    <div className="mt-20 pl-10 pr-3">
+    <div className="mt-4 xl:mt-20 px-4 xl:pl-10 xl:pr-8">
       <div className="">
-        <div className="flex justify-between">
-          <p className="font-bold text-xl mb-10">Dashboard</p>
-          <div>
+        {/* Header Section - Title hidden on mobile as it moves to MobileAppBar */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8 xl:mb-10">
+          <p className="font-bold text-2xl xl:text-xl hidden xl:block text-gray-800">Dashboard</p>
+          <div className="w-full sm:w-auto">
             <button
               onClick={exportDatabaseCSV}
-              className="cursor-pointer px-3 py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm hover:bg-gray-100 transition-colors "
+              className="w-full sm:w-auto cursor-pointer px-5 py-3 xl:py-2.5 border border-gray-200 rounded-xl xl:rounded flex items-center justify-center gap-2 text-sm font-medium hover:bg-gray-50 active:bg-gray-100 transition-all bg-white shadow-sm"
             >
-              <FiDownload /> Export All Data
+              <FiDownload className="text-lg xl:text-sm" /> Export All Data
             </button>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-5">
-          {/* Card 1 */}
-          <div className="shadow-lg border-t-4 border-purple-500 rounded-lg p-2 py-4 flex flex-col h-full transition-all duration-300 hover:shadow-xl">
-            <p className="text-base mb-5 text-gray-600">Daily Commission</p>
+
+        {/* Summary Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-4 xl:gap-5">
+          {/* Card 1: Daily Commission */}
+          <div className="bg-white shadow-sm border border-gray-100 border-t-4 border-t-purple-500 rounded-2xl xl:rounded-lg p-5 xl:p-2 xl:py-4 flex flex-col h-full transition-all duration-300 hover:shadow-md">
+            <p className="text-sm xl:text-base mb-3 xl:mb-5 text-gray-500 font-medium">Daily Commission</p>
             <div className="flex items-center justify-between mt-auto">
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-2xl xl:text-xl font-bold text-gray-900 tracking-tight">
                 ${dailyCommission ?? "0"}
               </p>
+              <div className="xl:hidden bg-purple-50 p-2 rounded-xl text-purple-600">
+                <FiDownload className="rotate-180" />
+              </div>
             </div>
           </div>
 
-          {/* Card 2 */}
-          <div className="shadow-lg border-t-4 border-purple-500 rounded-lg px-2 py-4 flex flex-col h-full transition-all duration-300 hover:shadow-xl">
-            <p className="text-base mb-5 text-gray-600">Weekly Commission</p>
+          <div className="bg-white shadow-sm border border-gray-100 border-t-4 border-t-purple-500 rounded-2xl xl:rounded-lg p-5 xl:p-2 xl:py-4 flex flex-col h-full transition-all duration-300 hover:shadow-md">
+            <p className="text-sm xl:text-base mb-3 xl:mb-5 text-gray-500 font-medium">Weekly Commission</p>
             <div className="flex items-center justify-between mt-auto">
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-2xl xl:text-xl font-bold text-gray-900 tracking-tight">
                 ${weeklyCommssion ?? "0"}
               </p>
             </div>
           </div>
 
-          {/* Card 3 */}
-          <div className="shadow-lg border-t-4 border-purple-500 rounded-lg px-2 py-4 flex flex-col h-full transition-all duration-300 hover:shadow-xl">
-            <p className="text-base mb-5 text-gray-600">Total Contracts</p>
+          <div className="bg-white shadow-sm border border-gray-100 border-t-4 border-t-purple-500 rounded-2xl xl:rounded-lg p-5 xl:p-2 xl:py-4 flex flex-col h-full transition-all duration-300 hover:shadow-md">
+            <p className="text-sm xl:text-base mb-3 xl:mb-5 text-gray-500 font-medium">Total Contracts</p>
             <div className="flex items-center justify-between mt-auto">
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-2xl xl:text-xl font-bold text-gray-900 tracking-tight">
                 {totalContracts ?? "0"}
               </p>
             </div>
           </div>
 
-          {/* Card 4 */}
-          <div className="shadow-lg border-t-4 border-purple-500 rounded-lg px-2 py-4 flex flex-col h-full transition-all duration-300 hover:shadow-xl">
-            <p className="text-base mb-5 text-gray-600">Completed Contracts</p>
+          <div className="bg-white shadow-sm border border-gray-100 border-t-4 border-t-purple-500 rounded-2xl xl:rounded-lg p-5 xl:p-2 xl:py-4 flex flex-col h-full transition-all duration-300 hover:shadow-md">
+            <p className="text-sm xl:text-base mb-3 xl:mb-5 text-gray-500 font-medium">Completed</p>
             <div className="mt-auto">
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-2xl xl:text-xl font-bold text-gray-900 tracking-tight">
                 {completedContracts ?? "0"}
               </p>
             </div>
           </div>
 
-          {/* Card 5 */}
-          <div className="shadow-lg border-t-4 border-purple-500 rounded-lg px-2 py-4 flex flex-col h-full transition-all duration-300 hover:shadow-xl">
-            <p className="text-base mb-5 text-gray-600">Uncomplete Contracts</p>
+          <div className="bg-white shadow-sm border border-gray-100 border-t-4 border-t-purple-500 rounded-2xl xl:rounded-lg p-5 xl:p-2 xl:py-4 flex flex-col h-full transition-all duration-300 hover:shadow-md">
+            <p className="text-sm xl:text-base mb-3 xl:mb-5 text-gray-500 font-medium">Incomplete</p>
             <div className="mt-auto">
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-2xl xl:text-xl font-bold text-gray-900 tracking-tight">
                 {uncompleteContracts ?? "0"}
               </p>
             </div>
           </div>
 
-          {/* Card 6 */}
-          <div className="shadow-lg border-t-4 border-purple-500 rounded-lg px-2 py-4 flex flex-col h-full transition-all duration-300 hover:shadow-xl">
-            <p className="text-base mb-5 text-gray-600">Today Contracts</p>
+          <div className="bg-white shadow-sm border border-gray-100 border-t-4 border-t-purple-500 rounded-2xl xl:rounded-lg p-5 xl:p-2 xl:py-4 flex flex-col h-full transition-all duration-300 hover:shadow-md">
+            <p className="text-sm xl:text-base mb-3 xl:mb-5 text-gray-500 font-medium">Today&apos;s New</p>
             <div className="mt-auto">
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-2xl xl:text-xl font-bold text-gray-900 tracking-tight">
                 {todayContracts ?? "0"}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 2xl:gap-10 gap-5 max-2xl:mt-10 mt-5 2xl:mt-40">
+        {/* Charts & Advanced Stats Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6 xl:gap-8 mt-10 xl:mt-20 pb-10">
           <HistoricalDailyCommision data={historicalCommissions} />
           <HistoycalNotebooks data={historicalContracts} />
           <HistoricalPrices data={historicalPrices} />

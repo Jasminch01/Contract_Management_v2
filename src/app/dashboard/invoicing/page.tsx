@@ -555,7 +555,7 @@ const InvoicingPage = () => {
 
   if (!isMounted) {
     return (
-      <div className="mt-20 flex justify-center items-center min-h-64">
+      <div className="mt-6 md:mt-20 flex justify-center items-center min-h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2A5D36]"></div>
         <span className="ml-3 text-gray-600">Initializing...</span>
       </div>
@@ -564,7 +564,7 @@ const InvoicingPage = () => {
 
   if (isLoading) {
     return (
-      <div className="mt-20 flex justify-center items-center min-h-64">
+      <div className="mt-6 md:mt-20 flex justify-center items-center min-h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2A5D36]"></div>
         <span className="ml-3 text-gray-600">
           Loading invoiced contracts...
@@ -575,7 +575,7 @@ const InvoicingPage = () => {
 
   if (isError) {
     return (
-      <div className="mt-20 flex flex-col justify-center items-center min-h-64">
+      <div className="mt-6 md:mt-20 flex flex-col justify-center items-center min-h-64">
         <div className="text-red-500 text-center">
           <IoWarning className="text-4xl mx-auto mb-2" />
           <p className="text-lg font-semibold">Error loading contracts</p>
@@ -594,7 +594,7 @@ const InvoicingPage = () => {
   }
 
   return (
-    <div className="mt-20">
+    <div className="mt-6 md:mt-20">
       <Toaster />
 
       {/* Delete Warning Modal */}

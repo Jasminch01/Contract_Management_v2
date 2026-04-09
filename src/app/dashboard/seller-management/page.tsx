@@ -378,7 +378,7 @@ const SellerManagementPage = () => {
   // Prevent hydration mismatch
   if (!isMounted) {
     return (
-      <div className="mt-20 flex justify-center items-center min-h-64">
+      <div className="mt-6 md:mt-20 flex justify-center items-center min-h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2A5D36]"></div>
         <span className="ml-3 text-gray-600">Initializing...</span>
       </div>
@@ -388,7 +388,7 @@ const SellerManagementPage = () => {
   // Loading state
   if (isLoading) {
     return (
-      <div className="mt-20 flex items-center justify-center min-h-64">
+      <div className="mt-6 md:mt-20 flex items-center justify-center min-h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#2A5D36] mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading sellers...</p>
@@ -400,7 +400,7 @@ const SellerManagementPage = () => {
   // Error state
   if (isError) {
     return (
-      <div className="mt-20 flex flex-col justify-center items-center min-h-64">
+      <div className="mt-6 md:mt-20 flex flex-col justify-center items-center min-h-64">
         <div className="text-red-500 text-center">
           <IoWarning className="text-4xl mx-auto mb-2" />
           <p className="text-lg font-semibold">Error loading sellers</p>
@@ -422,7 +422,7 @@ const SellerManagementPage = () => {
   }
 
   return (
-    <div className="mt-20">
+    <div className="mt-6 md:mt-20">
       <Toaster />
       {/* Header Section */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-gray-300 pb-5 px-4">

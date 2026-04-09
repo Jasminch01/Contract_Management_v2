@@ -397,7 +397,7 @@ const RubbishBin = () => {
     permanentDeleteMutation.isPending || emptyTrashMutation.isPending;
 
   return (
-    <div className="mt-20">
+    <div className="mt-6 md:mt-20">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 pb-5 border-b border-gray-300 px-4">
         {/* Title */}

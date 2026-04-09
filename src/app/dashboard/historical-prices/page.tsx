@@ -547,7 +547,7 @@ const HistoricalPricesPage = () => {
 
   if (!isMounted) {
     return (
-      <div className="mt-20">
+      <div className="mt-6 md:mt-20">
         <div className="text-center mb-10">
           <p className="text-xl">Historical Daily Prices</p>
         </div>
@@ -557,7 +557,7 @@ const HistoricalPricesPage = () => {
   }
 
   return (
-    <div className="mt-20">
+    <div className="mt-6 md:mt-20">
       <Toaster />
       <div className="text-center mb-10">
         <p className="text-xl">Historical Daily Prices</p>
