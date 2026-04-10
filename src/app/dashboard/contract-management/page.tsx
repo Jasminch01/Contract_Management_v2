@@ -2052,8 +2052,6 @@ const ContractManagementPage = () => {
             selectableRows
             onSelectedRowsChange={handleChange}
             clearSelectedRows={toggleCleared}
-            fixedHeader
-            fixedHeaderScrollHeight="550px"
             highlightOnHover
             selectableRowsHighlight
             responsive
