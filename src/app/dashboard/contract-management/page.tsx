@@ -1064,6 +1064,8 @@ const ContractManagementPage = () => {
         const contractDateStr = contract.contractDate || contract.createdAt;
         if (!contractDateStr) return latest;
         const contractDate = new Date(contractDateStr);
+        // Ensure we only compare valid dates
+        if (isNaN(contractDate.getTime())) return latest;
         return contractDate > latest ? contractDate : latest;
       }, new Date(0));
 
@@ -2191,22 +2193,29 @@ const ContractManagementPage = () => {
               {/* Contract Summary */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <h4 className="font-semibold text-gray-800 mb-3">
-                  Contract Details
+                  {selectedRows.length > 1
+                    ? "Combined Invoice Details"
+                    : "Contract Details"}
                 </h4>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <span className="text-gray-600">Contract Number:</span>
+                    <span className="text-gray-600">
+                      {selectedRows.length > 1 ? "Contracts:" : "Contract Number:"}
+                    </span>
                     <span className="ml-2 font-medium">
-                      {selectedRows[0]?.contractNumber}
+                      {selectedRows.length > 1
+                        ? `${selectedRows.length} Items Selected`
+                        : selectedRows[0]?.contractNumber}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600">Date:</span>
+                    <span className="text-gray-600">
+                      {selectedRows.length > 1 ? "Latest Date:" : "Date:"}
+                    </span>
                     <span className="ml-2 font-medium">
-                      {new Date(
-                        selectedRows[0]?.contractDate ||
-                        selectedRows[0]?.createdAt,
-                      ).toLocaleDateString()}
+                      {invoiceFormData.invoiceDate
+                        ? new Date(invoiceFormData.invoiceDate).toLocaleDateString()
+                        : "N/A"}
                     </span>
                   </div>
                   <div>
@@ -2221,22 +2230,40 @@ const ContractManagementPage = () => {
                       {selectedRows[0]?.seller?.legalName}
                     </span>
                   </div>
-                  <div>
-                    <span className="text-gray-600">Grade:</span>
-                    <span className="ml-2 font-medium">
-                      {selectedRows[0]?.grade}
+                  {selectedRows.length === 1 && (
+                    <>
+                      <div>
+                        <span className="text-gray-600">Grade:</span>
+                        <span className="ml-2 font-medium">
+                          {selectedRows[0]?.grade}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Tonnes:</span>
+                        <span className="ml-2 font-medium">
+                          {selectedRows[0]?.tonnes}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <div className={selectedRows.length > 1 ? "col-span-2" : "col-span-2"}>
+                    <span className="text-gray-600">
+                      {selectedRows.length > 1 ? "Total Tonnes:" : "Tonnes:"}
                     </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Tonnes:</span>
                     <span className="ml-2 font-medium">
-                      {selectedRows[0]?.tonnes}
+                      {selectedRows.length > 1
+                        ? selectedRows.reduce((sum, c) => sum + Number(c.tonnes || 0), 0).toLocaleString() + " MT"
+                        : selectedRows[0]?.tonnes}
                     </span>
                   </div>
                   <div className="col-span-2">
-                    <span className="text-gray-600">Price (Ex GST):</span>
+                    <span className="text-gray-600">
+                      {selectedRows.length > 1 ? "Total Price (Approx):" : "Price (Ex GST):"}
+                    </span>
                     <span className="ml-2 font-medium text-green-600">
-                      ${selectedRows[0]?.priceExGST?.toLocaleString() || 0}
+                      ${selectedRows.length > 1
+                        ? selectedRows.reduce((sum, c) => sum + (Number(c.priceExGST || 0) * Number(c.tonnes || 0)), 0).toLocaleString()
+                        : selectedRows[0]?.priceExGST?.toLocaleString() || 0}
                     </span>
                   </div>
                 </div>
