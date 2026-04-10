@@ -1813,7 +1813,7 @@ const ContractManagementPage = () => {
         </div>
 
         {/* Advanced Search Filter */}
-        <div className="w-full xl:w-[30rem] md:w-64 lg:w-80 relative">
+        <div className="w-full xl:w-120 md:w-64 lg:w-80 relative">
           <AdvanceSearchFilter
             onFilterChange={handleAdvanceFilterChange}
             initialFilters={paginationState.searchFilters}
@@ -1864,7 +1864,7 @@ const ContractManagementPage = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="w-full xl:w-auto flex flex-nowrap overflow-x-auto overflow-y-hidden gap-2 justify-start xl:justify-end flex-1 pb-2 [&>*]:shrink-0">
+          <div className="w-full xl:w-auto flex flex-wrap gap-2 justify-start xl:justify-end flex-1 pb-2">
             <button
               onClick={handleCreateInvoice}
               disabled={
@@ -1995,7 +1995,7 @@ const ContractManagementPage = () => {
                           }`}
                         onClick={() => handleStatusChange(option.value)}
                       >
-                        <span className="flex-grow">{option.label}</span>
+                        <span className="grow">{option.label}</span>
                         {paginationState.status === option.value && (
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -2324,7 +2324,7 @@ const ContractManagementPage = () => {
                 {/* Info Message */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-blue-800 flex items-start gap-2">
-                    <MdCheckCircle className="text-lg flex-shrink-0 mt-0.5" />
+                    <MdCheckCircle className="text-lg shrink-0 mt-0.5" />
                     <span>
                       This will create a draft invoice in Xero. You can review
                       and modify it before sending to the customer.
@@ -2689,7 +2689,7 @@ const ContractManagementPage = () => {
                 {/* Warning Message */}
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                   <div className="flex items-start gap-2">
-                    <IoWarning className="text-yellow-600 text-lg flex-shrink-0 mt-0.5" />
+                    <IoWarning className="text-yellow-600 text-lg shrink-0 mt-0.5" />
                     <p className="text-sm text-yellow-800">
                       This will update the status of all {selectedRows.length}{" "}
                       selected contract(s). This action cannot be undone.
