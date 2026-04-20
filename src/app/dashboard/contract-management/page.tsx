@@ -129,6 +129,7 @@ const statusOptions = [
   { value: "Invoiced", label: "Invoiced" },
   { value: "Manually-Invoiced", label: "Manually Invoiced" },
   { value: "Draft", label: "Draft" },
+  { value: "Uninvoiced", label: "Uninvoiced" },
 ];
 
 const ChangeStatusOptions = [
@@ -271,11 +272,11 @@ const ContractManagementPage = () => {
       return;
     }
 
-    // Check for invoiced contracts
+    // Warn about invoiced contracts (but don't block — user may want to set them to Uninvoiced)
     const invoicedContracts = selectedRows.filter(
       (row) =>
         row.status?.toLowerCase() === "invoiced" ||
-        row.status?.toLowerCase() === "menually-invoiced",
+        row.status?.toLowerCase() === "manually-invoiced",
     );
 
     if (invoicedContracts.length > 0) {
@@ -283,17 +284,16 @@ const ContractManagementPage = () => {
         .map((c) => c.contractNumber)
         .join(", ");
 
-      toast.error(
+      toast(
         <div>
-          <p className="font-semibold">Cannot Update Invoiced Contracts</p>
+          <p className="font-semibold">⚠️ Invoiced Contracts Selected</p>
           <p className="text-sm mt-1">
-            The following contracts are already invoiced and their status cannot
-            be changed: {invoicedNumbers}
+            The following contracts are invoiced: {invoicedNumbers}. Use
+            &quot;Uninvoiced&quot; status if you need to reverse the invoice.
           </p>
         </div>,
         { duration: 6000 },
       );
-      return;
     }
 
     setBulkStatusValue("");
@@ -555,11 +555,17 @@ const ContractManagementPage = () => {
               autoFocus
             >
               <option value="">Select status</option>
-              {ChangeStatusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              {(() => {
+                const isInvoiced = row.status?.toLowerCase() === "invoiced" || row.status?.toLowerCase() === "manually-invoiced";
+                const options = isInvoiced
+                  ? [...ChangeStatusOptions, { value: "Uninvoiced", label: "Uninvoiced" }]
+                  : ChangeStatusOptions;
+                return options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ));
+              })()}
             </select>
             <button
               onClick={() => handleStatusSave(row._id!)}
@@ -589,9 +595,11 @@ const ContractManagementPage = () => {
                 : row.status?.toLowerCase() === "invoiced" ||
                   row.status?.toLowerCase() === "manually-invoiced"
                   ? "text-[#3B82F6]"
-                  : row.status?.toLowerCase() === "draft"
-                    ? "text-[#EF4444]"
-                    : "text-[#FAD957]"
+                  : row.status?.toLowerCase() === "uninvoiced"
+                    ? "text-[#F97316]"
+                    : row.status?.toLowerCase() === "draft"
+                      ? "text-[#EF4444]"
+                      : "text-[#FAD957]"
                 }`}
             />
             <span>{row.status?.replace("-", " ") || "Unknown"}</span>
@@ -914,8 +922,8 @@ const ContractManagementPage = () => {
       return;
     }
 
-    // Filter out contracts that are not completed or invoiced
-    const allowedStatuses = ["complete", "invoiced"];
+    // Filter out contracts that are not completed, invoiced, or uninvoiced
+    const allowedStatuses = ["complete", "invoiced", "uninvoiced"];
 
     const invalidContracts = selectedRows.filter(
       (contract) =>
@@ -950,7 +958,7 @@ const ContractManagementPage = () => {
       toast.error(
         `Cannot create invoice: ${issues.join(
           "; ",
-        )}. Only completed or invoiced contracts can be invoiced.`,
+        )}. Only completed, invoiced, or uninvoiced contracts can be invoiced.`,
         { duration: 6000 },
       );
       return;
@@ -2054,6 +2062,8 @@ const ContractManagementPage = () => {
             selectableRows
             onSelectedRowsChange={handleChange}
             clearSelectedRows={toggleCleared}
+            fixedHeader
+            fixedHeaderScrollHeight="550px"
             highlightOnHover
             selectableRowsHighlight
             responsive
@@ -2699,15 +2709,26 @@ const ContractManagementPage = () => {
                     autoFocus
                   >
                     <option value="">Select new status</option>
-                    {updateStatusOptions.map((option) => (
-                      <option
-                        className={satoshiFont.className}
-                        key={option.value}
-                        value={option.value}
-                      >
-                        {option.label}
-                      </option>
-                    ))}
+                    {(() => {
+                      const allSelectedInvoiced = selectedRows.length > 0 && selectedRows.every(
+                        (row) =>
+                          row.status?.toLowerCase() === "invoiced" ||
+                          row.status?.toLowerCase() === "manually-invoiced"
+                      );
+                      const currentBulkOptions = allSelectedInvoiced
+                        ? [...updateStatusOptions, { value: "Uninvoiced", label: "Uninvoiced" }]
+                        : updateStatusOptions;
+                      
+                      return currentBulkOptions.map((option) => (
+                        <option
+                          className={satoshiFont.className}
+                          key={option.value}
+                          value={option.value}
+                        >
+                          {option.label}
+                        </option>
+                      ));
+                    })()}
                   </select>
                 </div>
 
