@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import DataTable from "react-data-table-component";
@@ -156,6 +156,29 @@ const calculateDueDate = (invoiceDateStr: string, daysOffset: number): string =>
 const ContractManagementPage = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  // Refs for status filter dropdown
+  const statusFilterRef = useRef<HTMLDivElement>(null);
+  const statusFilterButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Handle click outside to close status filter dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        statusFilterRef.current &&
+        !statusFilterRef.current.contains(event.target as Node) &&
+        statusFilterButtonRef.current &&
+        !statusFilterButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsFilterOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // State management
   const [isMounted, setIsMounted] = useState(false);
@@ -1444,13 +1467,21 @@ const ContractManagementPage = () => {
     }));
   };
 
-  const handleStatusChange = useCallback((value: string) => {
-    setPaginationState((prev) => ({
-      ...prev,
-      status: value,
-      page: 1,
-    }));
-    setIsFilterOpen(false);
+  const toggleStatusFilter = useCallback((value: string) => {
+    setPaginationState((prev) => {
+      const currentStatuses = prev.status ? prev.status.split(",") : [];
+      let newStatuses: string[];
+      if (currentStatuses.includes(value)) {
+        newStatuses = currentStatuses.filter((s) => s !== value);
+      } else {
+        newStatuses = [...currentStatuses, value];
+      }
+      return {
+        ...prev,
+        status: newStatuses.join(","),
+        page: 1,
+      };
+    });
     setSelectedRows([]);
     setToggleCleared((prev) => !prev);
   }, []);
@@ -1972,6 +2003,7 @@ const ContractManagementPage = () => {
             {/* Filter Dropdown */}
             <div className="relative">
               <button
+                ref={statusFilterButtonRef}
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
                 className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm cursor-pointer hover:bg-gray-100 transition-colors ${isFilterActive ? "bg-blue-50 border-blue-300" : ""
                   }`}
@@ -1988,7 +2020,10 @@ const ContractManagementPage = () => {
               </button>
 
               {isFilterOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-10 border border-gray-200 overflow-hidden">
+                <div
+                  ref={statusFilterRef}
+                  className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-10 border border-gray-200 overflow-hidden"
+                >
                   <div className="border-b border-gray-200 p-3">
                     <p className="font-medium text-gray-700">
                       Filter by Status
@@ -1996,32 +2031,29 @@ const ContractManagementPage = () => {
                   </div>
 
                   <div className="max-h-60 overflow-y-auto">
-                    {statusOptions.map((option) => (
-                      <div
-                        key={option.value}
-                        className={`px-4 py-2 text-sm cursor-pointer flex items-center ${paginationState.status === option.value
-                          ? "bg-blue-50 text-blue-600"
-                          : "hover:bg-gray-50"
-                          }`}
-                        onClick={() => handleStatusChange(option.value)}
-                      >
-                        <span className="grow">{option.label}</span>
-                        {paginationState.status === option.value && (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4 text-blue-500"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        )}
-                      </div>
-                    ))}
+                    {statusOptions.map((option) => {
+                      const isSelected = paginationState.status
+                        ? paginationState.status.split(",").includes(option.value)
+                        : false;
+                      return (
+                        <div
+                          key={option.value}
+                          className={`px-4 py-2 text-sm cursor-pointer flex items-center gap-2 hover:bg-gray-50 transition-colors ${isSelected
+                            ? "bg-blue-50/60 font-medium text-blue-700"
+                            : "text-gray-700"
+                            }`}
+                          onClick={() => toggleStatusFilter(option.value)}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-4 w-4"
+                          />
+                          <span className="grow">{option.label}</span>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {isFilterActive && (
