@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import DataTable from "react-data-table-component";
@@ -129,6 +129,7 @@ const statusOptions = [
   { value: "Invoiced", label: "Invoiced" },
   { value: "Manually-Invoiced", label: "Manually Invoiced" },
   { value: "Draft", label: "Draft" },
+  { value: "Uninvoiced", label: "Uninvoiced" },
 ];
 
 const ChangeStatusOptions = [
@@ -155,6 +156,29 @@ const calculateDueDate = (invoiceDateStr: string, daysOffset: number): string =>
 const ContractManagementPage = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
+
+  // Refs for status filter dropdown
+  const statusFilterRef = useRef<HTMLDivElement>(null);
+  const statusFilterButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Handle click outside to close status filter dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        statusFilterRef.current &&
+        !statusFilterRef.current.contains(event.target as Node) &&
+        statusFilterButtonRef.current &&
+        !statusFilterButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsFilterOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // State management
   const [isMounted, setIsMounted] = useState(false);
@@ -271,11 +295,11 @@ const ContractManagementPage = () => {
       return;
     }
 
-    // Check for invoiced contracts
+    // Warn about invoiced contracts (but don't block — user may want to set them to Uninvoiced)
     const invoicedContracts = selectedRows.filter(
       (row) =>
         row.status?.toLowerCase() === "invoiced" ||
-        row.status?.toLowerCase() === "menually-invoiced",
+        row.status?.toLowerCase() === "manually-invoiced",
     );
 
     if (invoicedContracts.length > 0) {
@@ -283,17 +307,16 @@ const ContractManagementPage = () => {
         .map((c) => c.contractNumber)
         .join(", ");
 
-      toast.error(
+      toast(
         <div>
-          <p className="font-semibold">Cannot Update Invoiced Contracts</p>
+          <p className="font-semibold">⚠️ Invoiced Contracts Selected</p>
           <p className="text-sm mt-1">
-            The following contracts are already invoiced and their status cannot
-            be changed: {invoicedNumbers}
+            The following contracts are invoiced: {invoicedNumbers}. Use
+            &quot;Uninvoiced&quot; status if you need to reverse the invoice.
           </p>
         </div>,
         { duration: 6000 },
       );
-      return;
     }
 
     setBulkStatusValue("");
@@ -555,11 +578,17 @@ const ContractManagementPage = () => {
               autoFocus
             >
               <option value="">Select status</option>
-              {ChangeStatusOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+              {(() => {
+                const isInvoiced = row.status?.toLowerCase() === "invoiced" || row.status?.toLowerCase() === "manually-invoiced";
+                const options = isInvoiced
+                  ? [...ChangeStatusOptions, { value: "Uninvoiced", label: "Uninvoiced" }]
+                  : ChangeStatusOptions;
+                return options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ));
+              })()}
             </select>
             <button
               onClick={() => handleStatusSave(row._id!)}
@@ -589,9 +618,11 @@ const ContractManagementPage = () => {
                 : row.status?.toLowerCase() === "invoiced" ||
                   row.status?.toLowerCase() === "manually-invoiced"
                   ? "text-[#3B82F6]"
-                  : row.status?.toLowerCase() === "draft"
-                    ? "text-[#EF4444]"
-                    : "text-[#FAD957]"
+                  : row.status?.toLowerCase() === "uninvoiced"
+                    ? "text-[#F97316]"
+                    : row.status?.toLowerCase() === "draft"
+                      ? "text-[#EF4444]"
+                      : "text-[#FAD957]"
                 }`}
             />
             <span>{row.status?.replace("-", " ") || "Unknown"}</span>
@@ -914,8 +945,8 @@ const ContractManagementPage = () => {
       return;
     }
 
-    // Filter out contracts that are not completed or invoiced
-    const allowedStatuses = ["complete", "invoiced"];
+    // Filter out contracts that are not completed, invoiced, or uninvoiced
+    const allowedStatuses = ["complete", "invoiced", "uninvoiced"];
 
     const invalidContracts = selectedRows.filter(
       (contract) =>
@@ -950,7 +981,7 @@ const ContractManagementPage = () => {
       toast.error(
         `Cannot create invoice: ${issues.join(
           "; ",
-        )}. Only completed or invoiced contracts can be invoiced.`,
+        )}. Only completed, invoiced, or uninvoiced contracts can be invoiced.`,
         { duration: 6000 },
       );
       return;
@@ -1064,6 +1095,8 @@ const ContractManagementPage = () => {
         const contractDateStr = contract.contractDate || contract.createdAt;
         if (!contractDateStr) return latest;
         const contractDate = new Date(contractDateStr);
+        // Ensure we only compare valid dates
+        if (isNaN(contractDate.getTime())) return latest;
         return contractDate > latest ? contractDate : latest;
       }, new Date(0));
 
@@ -1434,13 +1467,21 @@ const ContractManagementPage = () => {
     }));
   };
 
-  const handleStatusChange = useCallback((value: string) => {
-    setPaginationState((prev) => ({
-      ...prev,
-      status: value,
-      page: 1,
-    }));
-    setIsFilterOpen(false);
+  const toggleStatusFilter = useCallback((value: string) => {
+    setPaginationState((prev) => {
+      const currentStatuses = prev.status ? prev.status.split(",") : [];
+      let newStatuses: string[];
+      if (currentStatuses.includes(value)) {
+        newStatuses = currentStatuses.filter((s) => s !== value);
+      } else {
+        newStatuses = [...currentStatuses, value];
+      }
+      return {
+        ...prev,
+        status: newStatuses.join(","),
+        page: 1,
+      };
+    });
     setSelectedRows([]);
     setToggleCleared((prev) => !prev);
   }, []);
@@ -1813,7 +1854,7 @@ const ContractManagementPage = () => {
         </div>
 
         {/* Advanced Search Filter */}
-        <div className="w-full xl:w-[30rem] md:w-64 lg:w-80 relative">
+        <div className="w-full xl:w-120 md:w-64 lg:w-80 relative">
           <AdvanceSearchFilter
             onFilterChange={handleAdvanceFilterChange}
             initialFilters={paginationState.searchFilters}
@@ -1864,7 +1905,7 @@ const ContractManagementPage = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="w-full xl:w-auto flex flex-nowrap overflow-x-auto overflow-y-hidden gap-2 justify-start xl:justify-end flex-1 pb-2 [&>*]:shrink-0">
+          <div className="w-full xl:w-auto flex flex-wrap gap-2 justify-start xl:justify-end flex-1 pb-2">
             <button
               onClick={handleCreateInvoice}
               disabled={
@@ -1962,6 +2003,7 @@ const ContractManagementPage = () => {
             {/* Filter Dropdown */}
             <div className="relative">
               <button
+                ref={statusFilterButtonRef}
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
                 className={`w-full md:w-auto xl:px-3 xl:py-2 border border-gray-200 rounded flex items-center justify-center gap-2 text-sm cursor-pointer hover:bg-gray-100 transition-colors ${isFilterActive ? "bg-blue-50 border-blue-300" : ""
                   }`}
@@ -1978,7 +2020,10 @@ const ContractManagementPage = () => {
               </button>
 
               {isFilterOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-10 border border-gray-200 overflow-hidden">
+                <div
+                  ref={statusFilterRef}
+                  className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-10 border border-gray-200 overflow-hidden"
+                >
                   <div className="border-b border-gray-200 p-3">
                     <p className="font-medium text-gray-700">
                       Filter by Status
@@ -1986,32 +2031,29 @@ const ContractManagementPage = () => {
                   </div>
 
                   <div className="max-h-60 overflow-y-auto">
-                    {statusOptions.map((option) => (
-                      <div
-                        key={option.value}
-                        className={`px-4 py-2 text-sm cursor-pointer flex items-center ${paginationState.status === option.value
-                          ? "bg-blue-50 text-blue-600"
-                          : "hover:bg-gray-50"
-                          }`}
-                        onClick={() => handleStatusChange(option.value)}
-                      >
-                        <span className="flex-grow">{option.label}</span>
-                        {paginationState.status === option.value && (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4 text-blue-500"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        )}
-                      </div>
-                    ))}
+                    {statusOptions.map((option) => {
+                      const isSelected = paginationState.status
+                        ? paginationState.status.split(",").includes(option.value)
+                        : false;
+                      return (
+                        <div
+                          key={option.value}
+                          className={`px-4 py-2 text-sm cursor-pointer flex items-center gap-2 hover:bg-gray-50 transition-colors ${isSelected
+                            ? "bg-blue-50/60 font-medium text-blue-700"
+                            : "text-gray-700"
+                            }`}
+                          onClick={() => toggleStatusFilter(option.value)}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-4 w-4"
+                          />
+                          <span className="grow">{option.label}</span>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   {isFilterActive && (
@@ -2193,22 +2235,29 @@ const ContractManagementPage = () => {
               {/* Contract Summary */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                 <h4 className="font-semibold text-gray-800 mb-3">
-                  Contract Details
+                  {selectedRows.length > 1
+                    ? "Combined Invoice Details"
+                    : "Contract Details"}
                 </h4>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <span className="text-gray-600">Contract Number:</span>
+                    <span className="text-gray-600">
+                      {selectedRows.length > 1 ? "Contracts:" : "Contract Number:"}
+                    </span>
                     <span className="ml-2 font-medium">
-                      {selectedRows[0]?.contractNumber}
+                      {selectedRows.length > 1
+                        ? `${selectedRows.length} Items Selected`
+                        : selectedRows[0]?.contractNumber}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600">Date:</span>
+                    <span className="text-gray-600">
+                      {selectedRows.length > 1 ? "Latest Date:" : "Date:"}
+                    </span>
                     <span className="ml-2 font-medium">
-                      {new Date(
-                        selectedRows[0]?.contractDate ||
-                        selectedRows[0]?.createdAt,
-                      ).toLocaleDateString()}
+                      {invoiceFormData.invoiceDate
+                        ? new Date(invoiceFormData.invoiceDate).toLocaleDateString()
+                        : "N/A"}
                     </span>
                   </div>
                   <div>
@@ -2223,22 +2272,40 @@ const ContractManagementPage = () => {
                       {selectedRows[0]?.seller?.legalName}
                     </span>
                   </div>
-                  <div>
-                    <span className="text-gray-600">Grade:</span>
-                    <span className="ml-2 font-medium">
-                      {selectedRows[0]?.grade}
+                  {selectedRows.length === 1 && (
+                    <>
+                      <div>
+                        <span className="text-gray-600">Grade:</span>
+                        <span className="ml-2 font-medium">
+                          {selectedRows[0]?.grade}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Tonnes:</span>
+                        <span className="ml-2 font-medium">
+                          {selectedRows[0]?.tonnes}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                  <div className={selectedRows.length > 1 ? "col-span-2" : "col-span-2"}>
+                    <span className="text-gray-600">
+                      {selectedRows.length > 1 ? "Total Tonnes:" : "Tonnes:"}
                     </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Tonnes:</span>
                     <span className="ml-2 font-medium">
-                      {selectedRows[0]?.tonnes}
+                      {selectedRows.length > 1
+                        ? selectedRows.reduce((sum, c) => sum + Number(c.tonnes || 0), 0).toLocaleString() + " MT"
+                        : selectedRows[0]?.tonnes}
                     </span>
                   </div>
                   <div className="col-span-2">
-                    <span className="text-gray-600">Price (Ex GST):</span>
+                    <span className="text-gray-600">
+                      {selectedRows.length > 1 ? "Total Price (Approx):" : "Price (Ex GST):"}
+                    </span>
                     <span className="ml-2 font-medium text-green-600">
-                      ${selectedRows[0]?.priceExGST?.toLocaleString() || 0}
+                      ${selectedRows.length > 1
+                        ? selectedRows.reduce((sum, c) => sum + (Number(c.priceExGST || 0) * Number(c.tonnes || 0)), 0).toLocaleString()
+                        : selectedRows[0]?.priceExGST?.toLocaleString() || 0}
                     </span>
                   </div>
                 </div>
@@ -2324,7 +2391,7 @@ const ContractManagementPage = () => {
                 {/* Info Message */}
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <p className="text-sm text-blue-800 flex items-start gap-2">
-                    <MdCheckCircle className="text-lg flex-shrink-0 mt-0.5" />
+                    <MdCheckCircle className="text-lg shrink-0 mt-0.5" />
                     <span>
                       This will create a draft invoice in Xero. You can review
                       and modify it before sending to the customer.
@@ -2674,22 +2741,33 @@ const ContractManagementPage = () => {
                     autoFocus
                   >
                     <option value="">Select new status</option>
-                    {updateStatusOptions.map((option) => (
-                      <option
-                        className={satoshiFont.className}
-                        key={option.value}
-                        value={option.value}
-                      >
-                        {option.label}
-                      </option>
-                    ))}
+                    {(() => {
+                      const allSelectedInvoiced = selectedRows.length > 0 && selectedRows.every(
+                        (row) =>
+                          row.status?.toLowerCase() === "invoiced" ||
+                          row.status?.toLowerCase() === "manually-invoiced"
+                      );
+                      const currentBulkOptions = allSelectedInvoiced
+                        ? [...updateStatusOptions, { value: "Uninvoiced", label: "Uninvoiced" }]
+                        : updateStatusOptions;
+                      
+                      return currentBulkOptions.map((option) => (
+                        <option
+                          className={satoshiFont.className}
+                          key={option.value}
+                          value={option.value}
+                        >
+                          {option.label}
+                        </option>
+                      ));
+                    })()}
                   </select>
                 </div>
 
                 {/* Warning Message */}
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                   <div className="flex items-start gap-2">
-                    <IoWarning className="text-yellow-600 text-lg flex-shrink-0 mt-0.5" />
+                    <IoWarning className="text-yellow-600 text-lg shrink-0 mt-0.5" />
                     <p className="text-sm text-yellow-800">
                       This will update the status of all {selectedRows.length}{" "}
                       selected contract(s). This action cannot be undone.

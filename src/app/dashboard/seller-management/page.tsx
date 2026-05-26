@@ -437,7 +437,7 @@ const SellerManagementPage = () => {
         </div>
 
         {/* Search Input */}
-        <div className="w-full xl:w-[30rem] md:w-64 lg:w-80 px-4 py-2 rounded-md border border-gray-300 flex items-center gap-2 bg-white shadow-sm">
+        <div className="w-full xl:w-120 md:w-64 lg:w-80 px-4 py-2 rounded-md border border-gray-300 flex items-center gap-2 bg-white shadow-sm">
           <input
             type="text"
             placeholder="Search by Name, ABN, MainNGR"
@@ -492,11 +492,10 @@ const SellerManagementPage = () => {
           <div className="w-full md:w-auto flex gap-2">
             <button
               onClick={handleEdit}
-              className={`w-full md:w-auto px-3 py-2 border border-gray-300 rounded-md flex items-center justify-center gap-2 text-sm hover:bg-gray-50 transition-colors shadow-sm ${
-                selectedRows.length === 1
+              className={`w-full md:w-auto px-3 py-2 border border-gray-300 rounded-md flex items-center justify-center gap-2 text-sm hover:bg-gray-50 transition-colors shadow-sm ${selectedRows.length === 1
                   ? "cursor-pointer"
                   : "cursor-not-allowed opacity-50"
-              }`}
+                }`}
               disabled={selectedRows.length !== 1}
             >
               <MdOutlineEdit />
@@ -504,11 +503,10 @@ const SellerManagementPage = () => {
             </button>
             <button
               onClick={handleDelete}
-              className={`w-full md:w-auto px-3 py-2 border border-gray-300 rounded-md flex items-center justify-center gap-2 text-sm hover:bg-gray-50 transition-colors shadow-sm ${
-                selectedRows.length > 0 && !deleteSellerMutation.isPending
+              className={`w-full md:w-auto px-3 py-2 border border-gray-300 rounded-md flex items-center justify-center gap-2 text-sm hover:bg-gray-50 transition-colors shadow-sm ${selectedRows.length > 0 && !deleteSellerMutation.isPending
                   ? "cursor-pointer"
                   : "cursor-not-allowed opacity-50"
-              }`}
+                }`}
               disabled={
                 selectedRows.length === 0 || deleteSellerMutation.isPending
               }
@@ -525,9 +523,8 @@ const SellerManagementPage = () => {
             <div className="relative">
               <button
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className={`w-full md:w-auto px-3 py-2 border border-gray-300 rounded-md flex items-center justify-center gap-2 text-sm cursor-pointer hover:bg-gray-50 transition-colors shadow-sm ${
-                  isFilterActive ? "bg-blue-50 border-blue-300" : ""
-                }`}
+                className={`w-full md:w-auto px-3 py-2 border border-gray-300 rounded-md flex items-center justify-center gap-2 text-sm cursor-pointer hover:bg-gray-50 transition-colors shadow-sm ${isFilterActive ? "bg-blue-50 border-blue-300" : ""
+                  }`}
               >
                 <IoFilterSharp
                   className={isFilterActive ? "text-blue-600" : ""}
@@ -552,14 +549,13 @@ const SellerManagementPage = () => {
                     {dateFilterOptions.map((option) => (
                       <div
                         key={option.value}
-                        className={`px-4 py-2 text-sm cursor-pointer flex items-center ${
-                          paginationState.dateFilter === option.value
+                        className={`px-4 py-2 text-sm cursor-pointer flex items-center ${paginationState.dateFilter === option.value
                             ? "bg-blue-50 text-blue-600"
                             : "hover:bg-gray-50"
-                        }`}
+                          }`}
                         onClick={() => handleDateFilterChange(option.value)}
                       >
-                        <span className="flex-grow">{option.label}</span>
+                        <span className="grow">{option.label}</span>
                         {paginationState.dateFilter === option.value && (
                           <svg
                             xmlns="http://www.w3.org/2000/svg"

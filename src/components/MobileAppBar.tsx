@@ -26,7 +26,7 @@ const MobileAppBar = () => {
           alt="Logo"
           width={32}
           height={32}
-          className="rounded-lg shadow-sm"
+          className="rounded-lg"
         />
         <h1 className="font-bold text-lg text-gray-800 tracking-tight">
           {getTitle(pathname)}

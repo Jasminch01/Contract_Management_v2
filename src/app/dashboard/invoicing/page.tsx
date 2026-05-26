@@ -630,7 +630,12 @@ const InvoicingPage = () => {
 
             <button
               onClick={handleExport}
-              className="px-4 py-2 bg-[#2A5D36] text-white rounded-lg hover:bg-[#1e4728] transition-colors flex items-center gap-2 font-medium"
+              disabled={contracts.length === 0}
+              className={`px-4 py-2 text-white rounded-lg transition-colors flex items-center gap-2 font-medium ${
+                contracts.length === 0 
+                  ? "bg-gray-400 cursor-not-allowed" 
+                  : "bg-[#2A5D36] hover:bg-[#1e4728]"
+              }`}
             >
               <MdFileDownload className="text-xl" />
               Export{" "}

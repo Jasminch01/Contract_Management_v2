@@ -31,7 +31,6 @@ const BottomNav = () => {
     { label: "Seller Management", icon: <FiUsers />, link: "/dashboard/seller-management" },
     { label: "Historical Prices", icon: <FiClock />, link: "/dashboard/historical-prices" },
     { label: "Rubbish Bin", icon: <FiTrash2 />, link: "/dashboard/rubbish-bin" },
-    { label: "Profile Settings", icon: <FiSettings />, link: "/dashboard" },
   ];
 
   return (
